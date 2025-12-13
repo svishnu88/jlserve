@@ -1,0 +1,30 @@
+[project]
+name = "jarvis"
+version = "0.1.0"
+description = "A simple framework for creating ML endpoints"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.32.0",
+    "typer>=0.15.0",
+]
+
+[project.scripts]
+jarvis = "jarvis.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "httpx>=0.28.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["jarvis"]
+python_files = ["*_test.py"]
+python_functions = ["test_*"]
