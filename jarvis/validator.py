@@ -1,107 +1,145 @@
-"""Validation logic for Jarvis endpoint classes."""
+"""Validation logic for Jarvis app classes."""
 
 import inspect
-from typing import Type, get_type_hints
+from typing import Callable, Type, get_type_hints
 
 from pydantic import BaseModel
 
+from jarvis.decorator import get_endpoint_methods
 from jarvis.exceptions import EndpointValidationError
 
 
-def validate_endpoint(cls: Type) -> None:
-    """Validate that an endpoint class meets all requirements.
+def validate_app(cls: Type) -> None:
+    """Validate that an app class meets all requirements.
 
     Args:
-        cls: The endpoint class to validate.
+        cls: The app class to validate.
 
     Raises:
         EndpointValidationError: If validation fails.
     """
-    validate_has_run_method(cls)
-    validate_run_type_hints(cls)
-    validate_input_is_pydantic_model(cls)
-    validate_output_is_pydantic_model(cls)
+    validate_is_jarvis_app(cls)
+    validate_has_endpoint_methods(cls)
+    validate_endpoint_methods(cls)
+    validate_no_duplicate_paths(cls)
 
 
-def validate_has_run_method(cls: Type) -> None:
-    """Check that the class has a run() method.
+def validate_is_jarvis_app(cls: Type) -> None:
+    """Check that the class is decorated with @jarvis.app().
 
     Raises:
-        EndpointValidationError: If run() method is missing.
+        EndpointValidationError: If the class is not a Jarvis app.
     """
-    if not hasattr(cls, "run") or not callable(getattr(cls, "run")):
+    if not getattr(cls, "_jarvis_app", False):
         raise EndpointValidationError(
-            "Endpoint class must define a run() method"
+            f"Class {cls.__name__} must be decorated with @jarvis.app()"
         )
 
 
-def validate_run_type_hints(cls: Type) -> None:
-    """Check that run() has type hints for input and return type.
+def validate_has_endpoint_methods(cls: Type) -> None:
+    """Check that the app class has at least one @endpoint() decorated method.
+
+    Raises:
+        EndpointValidationError: If no endpoint methods are found.
+    """
+    methods = get_endpoint_methods(cls)
+    if not methods:
+        raise EndpointValidationError(
+            f"App {cls.__name__} must have at least one method decorated with @jarvis.endpoint()"
+        )
+
+
+def validate_endpoint_methods(cls: Type) -> None:
+    """Validate all endpoint methods have proper type hints.
+
+    Raises:
+        EndpointValidationError: If any endpoint method has invalid type hints.
+    """
+    methods = get_endpoint_methods(cls)
+    for method in methods:
+        validate_method_type_hints(method)
+        validate_method_input_is_pydantic_model(method)
+        validate_method_output_is_pydantic_model(method)
+
+
+def validate_method_type_hints(method: Callable) -> None:
+    """Check that an endpoint method has type hints for input and return type.
 
     Raises:
         EndpointValidationError: If type hints are missing.
     """
-    run_method = getattr(cls, "run")
-    hints = get_type_hints(run_method)
-
-    # Get the signature to check parameter names
-    sig = inspect.signature(run_method)
+    hints = get_type_hints(method)
+    sig = inspect.signature(method)
     params = list(sig.parameters.keys())
 
     # Should have at least 'self' and one input parameter
     if len(params) < 2:
         raise EndpointValidationError(
-            "run() must have type hints for input and output"
+            f"Endpoint method {method.__name__}() must accept an input parameter with a type hint"
         )
 
     # The input parameter (second param after self)
     input_param = params[1]
     if input_param not in hints:
         raise EndpointValidationError(
-            "run() must have type hints for input and output"
+            f"Endpoint method {method.__name__}() must have a type hint for input parameter '{input_param}'"
         )
 
     # Check return type
     if "return" not in hints:
         raise EndpointValidationError(
-            "run() must have type hints for input and output"
+            f"Endpoint method {method.__name__}() must have a return type hint"
         )
 
 
-def validate_input_is_pydantic_model(cls: Type) -> None:
+def validate_method_input_is_pydantic_model(method: Callable) -> None:
     """Check that the input type hint is a Pydantic BaseModel subclass.
 
     Raises:
         EndpointValidationError: If input is not a Pydantic model.
     """
-    run_method = getattr(cls, "run")
-    hints = get_type_hints(run_method)
-
-    sig = inspect.signature(run_method)
+    hints = get_type_hints(method)
+    sig = inspect.signature(method)
     params = list(sig.parameters.keys())
     input_param = params[1]
     input_type = hints.get(input_param)
 
     if input_type is None or not _is_pydantic_model(input_type):
         raise EndpointValidationError(
-            f"Input type must be a Pydantic BaseModel subclass, got {input_type}"
+            f"Endpoint method {method.__name__}(): input type must be a Pydantic BaseModel subclass, got {input_type}"
         )
 
 
-def validate_output_is_pydantic_model(cls: Type) -> None:
+def validate_method_output_is_pydantic_model(method: Callable) -> None:
     """Check that the return type hint is a Pydantic BaseModel subclass.
 
     Raises:
         EndpointValidationError: If output is not a Pydantic model.
     """
-    run_method = getattr(cls, "run")
-    hints = get_type_hints(run_method)
+    hints = get_type_hints(method)
     output_type = hints.get("return")
 
     if output_type is None or not _is_pydantic_model(output_type):
         raise EndpointValidationError(
-            f"Output type must be a Pydantic BaseModel subclass, got {output_type}"
+            f"Endpoint method {method.__name__}(): return type must be a Pydantic BaseModel subclass, got {output_type}"
         )
+
+
+def validate_no_duplicate_paths(cls: Type) -> None:
+    """Check that no two endpoint methods have the same path.
+
+    Raises:
+        EndpointValidationError: If duplicate paths are found.
+    """
+    methods = get_endpoint_methods(cls)
+    paths = {}
+    for method in methods:
+        path = method._jarvis_endpoint_path
+        if path in paths:
+            raise EndpointValidationError(
+                f"Duplicate endpoint path '{path}' found in methods {paths[path]}() and {method.__name__}()"
+            )
+        paths[path] = method.__name__
 
 
 def _is_pydantic_model(type_hint: Type) -> bool:
@@ -112,18 +150,30 @@ def _is_pydantic_model(type_hint: Type) -> bool:
         return False
 
 
-def get_input_type(cls: Type) -> Type[BaseModel]:
-    """Get the input Pydantic model type from an endpoint class."""
-    run_method = getattr(cls, "run")
-    hints = get_type_hints(run_method)
-    sig = inspect.signature(run_method)
+def get_method_input_type(method: Callable) -> Type[BaseModel]:
+    """Get the input Pydantic model type from an endpoint method.
+
+    Args:
+        method: The endpoint method to inspect.
+
+    Returns:
+        The Pydantic BaseModel subclass used as input type.
+    """
+    hints = get_type_hints(method)
+    sig = inspect.signature(method)
     params = list(sig.parameters.keys())
     input_param = params[1]
     return hints[input_param]
 
 
-def get_output_type(cls: Type) -> Type[BaseModel]:
-    """Get the output Pydantic model type from an endpoint class."""
-    run_method = getattr(cls, "run")
-    hints = get_type_hints(run_method)
+def get_method_output_type(method: Callable) -> Type[BaseModel]:
+    """Get the output Pydantic model type from an endpoint method.
+
+    Args:
+        method: The endpoint method to inspect.
+
+    Returns:
+        The Pydantic BaseModel subclass used as return type.
+    """
+    hints = get_type_hints(method)
     return hints["return"]

@@ -1,177 +1,357 @@
-"""Unit tests for FastAPI server integration."""
+"""Unit tests for FastAPI server integration with multi-endpoint apps."""
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from jarvis.exceptions import EndpointValidationError
+import jarvis
+from jarvis.decorator import clear_registry
+from jarvis.exceptions import EndpointSetupError, EndpointValidationError
 from jarvis.server import create_app
 
 
 class Input(BaseModel):
-    name: str
+    value: int
 
 
 class Output(BaseModel):
-    message: str
+    result: int
+
+
+class TwoNumbers(BaseModel):
+    a: int
+    b: int
+
+
+class Result(BaseModel):
+    result: int
 
 
 class TestCreateApp:
+    """Tests for creating FastAPI apps from Jarvis app classes."""
+
     def test_creates_fastapi_app(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+        clear_registry()
 
-        app = create_app(MyEndpoint)
+        @jarvis.app()
+        class MyApp:
+            @jarvis.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value * 2)
+
+        app = create_app(MyApp)
         assert app is not None
-        assert app.title == "endpoint"  # No _jarvis_endpoint_name set
 
-    def test_uses_endpoint_name_as_title(self):
-        class MyEndpoint:
-            _jarvis_endpoint_name = "greeter"
+    def test_uses_app_name_as_title(self):
+        clear_registry()
 
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+        @jarvis.app(name="Calculator")
+        class MyApp:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
 
-        app = create_app(MyEndpoint)
-        assert app.title == "greeter"
+        app = create_app(MyApp)
+        assert app.title == "Calculator"
 
-    def test_invalid_endpoint_raises_error(self):
-        class InvalidEndpoint:
+    def test_uses_class_name_as_default_title(self):
+        clear_registry()
+
+        @jarvis.app()
+        class MyCalculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+        app = create_app(MyCalculator)
+        assert app.title == "MyCalculator"
+
+    def test_invalid_app_raises_error(self):
+        class NotAnApp:
             pass
 
         with pytest.raises(EndpointValidationError):
-            create_app(InvalidEndpoint)
+            create_app(NotAnApp)
 
 
-class TestEndpointRoute:
-    def test_post_returns_valid_response(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+class TestMultiRouteRegistration:
+    """Tests for registering multiple endpoint routes."""
 
-        app = create_app(MyEndpoint)
+    def test_registers_multiple_routes(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+            @jarvis.endpoint()
+            def subtract(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a - input.b)
+
+        app = create_app(Calculator)
+
+        # Check routes are registered
+        paths = [route.path for route in app.routes if hasattr(route, "path")]
+        assert "/add" in paths
+        assert "/subtract" in paths
+
+    def test_custom_paths_registered(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint(path="/plus")
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+            @jarvis.endpoint(path="/minus")
+            def subtract(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a - input.b)
+
+        app = create_app(Calculator)
+
+        paths = [route.path for route in app.routes if hasattr(route, "path")]
+        assert "/plus" in paths
+        assert "/minus" in paths
+        assert "/add" not in paths
+        assert "/subtract" not in paths
+
+
+class TestEndpointRoutes:
+    """Tests for endpoint route functionality."""
+
+    def test_post_to_add_endpoint(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+        app = create_app(Calculator)
         with TestClient(app) as client:
-            response = client.post("/", json={"name": "World"})
+            response = client.post("/add", json={"a": 5, "b": 3})
             assert response.status_code == 200
-            assert response.json() == {"message": "Hello, World!"}
+            assert response.json() == {"result": 8}
+
+    def test_post_to_subtract_endpoint(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint()
+            def subtract(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a - input.b)
+
+        app = create_app(Calculator)
+        with TestClient(app) as client:
+            response = client.post("/subtract", json={"a": 10, "b": 4})
+            assert response.status_code == 200
+            assert response.json() == {"result": 6}
+
+    def test_multiple_endpoints_work_together(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+            @jarvis.endpoint()
+            def subtract(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a - input.b)
+
+            @jarvis.endpoint()
+            def multiply(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a * input.b)
+
+        app = create_app(Calculator)
+        with TestClient(app) as client:
+            assert client.post("/add", json={"a": 2, "b": 3}).json() == {"result": 5}
+            assert client.post("/subtract", json={"a": 5, "b": 2}).json() == {"result": 3}
+            assert client.post("/multiply", json={"a": 4, "b": 3}).json() == {"result": 12}
 
     def test_invalid_input_returns_422(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+        clear_registry()
 
-        app = create_app(MyEndpoint)
+        @jarvis.app()
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
+
+        app = create_app(Calculator)
         with TestClient(app) as client:
-            response = client.post("/", json={"wrong_field": "value"})
+            response = client.post("/add", json={"wrong_field": "value"})
             assert response.status_code == 422
 
-    def test_missing_body_returns_422(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
 
-        app = create_app(MyEndpoint)
+class TestSharedState:
+    """Tests for shared state across endpoints."""
+
+    def test_shared_instance_across_endpoints(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Counter:
+            def __init__(self):
+                self.count = 0
+
+            @jarvis.endpoint()
+            def increment(self, input: Input) -> Output:
+                self.count += input.value
+                return Output(result=self.count)
+
+            @jarvis.endpoint()
+            def get_count(self, input: Input) -> Output:
+                return Output(result=self.count)
+
+        app = create_app(Counter)
         with TestClient(app) as client:
-            response = client.post("/")
-            assert response.status_code == 422
+            # Increment multiple times
+            client.post("/increment", json={"value": 5})
+            client.post("/increment", json={"value": 3})
+
+            # Get count should reflect all increments
+            response = client.post("/get_count", json={"value": 0})
+            assert response.json() == {"result": 8}
+
+    def test_setup_initializes_shared_state(self):
+        clear_registry()
+
+        @jarvis.app()
+        class Calculator:
+            def setup(self):
+                self.multiplier = 10
+
+            @jarvis.endpoint()
+            def scale(self, input: Input) -> Output:
+                return Output(result=input.value * self.multiplier)
+
+        app = create_app(Calculator)
+        with TestClient(app) as client:
+            response = client.post("/scale", json={"value": 5})
+            assert response.json() == {"result": 50}
 
 
 class TestSetupMethod:
+    """Tests for the setup() method lifecycle."""
+
     def test_setup_is_called_on_startup(self):
-        class MyEndpoint:
+        clear_registry()
+
+        @jarvis.app()
+        class MyApp:
             def setup(self):
-                self.prefix = "Hi"
+                self.prefix = "Processed"
 
-            def run(self, input: Input) -> Output:
-                return Output(message=f"{self.prefix}, {input.name}!")
+            @jarvis.endpoint()
+            def process(self, input: Input) -> Output:
+                # If setup wasn't called, this would raise AttributeError
+                return Output(result=input.value if self.prefix else 0)
 
-        app = create_app(MyEndpoint)
+        app = create_app(MyApp)
         with TestClient(app) as client:
-            response = client.post("/", json={"name": "World"})
-            assert response.status_code == 200
-            assert response.json() == {"message": "Hi, World!"}
-
-    def test_endpoint_without_setup_works(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
-
-        app = create_app(MyEndpoint)
-        with TestClient(app) as client:
-            response = client.post("/", json={"name": "World"})
+            response = client.post("/process", json={"value": 42})
             assert response.status_code == 200
 
+    def test_app_without_setup_works(self):
+        clear_registry()
 
-class TestErrorHandling:
-    def test_exception_in_run_returns_500(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                raise ValueError("Something went wrong")
+        @jarvis.app()
+        class MyApp:
+            @jarvis.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value * 2)
 
-        app = create_app(MyEndpoint)
+        app = create_app(MyApp)
         with TestClient(app) as client:
-            response = client.post("/", json={"name": "World"})
-            assert response.status_code == 500
-            assert "Something went wrong" in response.json()["detail"]
+            response = client.post("/process", json={"value": 5})
+            assert response.status_code == 200
+            assert response.json() == {"result": 10}
 
     def test_setup_failure_prevents_startup(self):
-        from jarvis.exceptions import EndpointSetupError
+        clear_registry()
 
-        class MyEndpoint:
+        @jarvis.app()
+        class MyApp:
             def setup(self):
                 raise RuntimeError("Setup failed!")
 
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+            @jarvis.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
 
-        app = create_app(MyEndpoint)
+        app = create_app(MyApp)
         with pytest.raises(EndpointSetupError) as exc_info:
             with TestClient(app):
                 pass
         assert "Setup failed!" in str(exc_info.value)
 
-    def test_invalid_json_returns_422_with_details(self):
-        class MyEndpoint:
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
 
-        app = create_app(MyEndpoint)
+class TestErrorHandling:
+    """Tests for error handling in endpoints."""
+
+    def test_exception_in_endpoint_returns_500(self):
+        clear_registry()
+
+        @jarvis.app()
+        class MyApp:
+            @jarvis.endpoint()
+            def failing(self, input: Input) -> Output:
+                raise ValueError("Something went wrong")
+
+        app = create_app(MyApp)
         with TestClient(app) as client:
-            response = client.post("/", json={"wrong_field": "value"})
-            assert response.status_code == 422
-            # Verify validation error details are included
-            assert "detail" in response.json()
+            response = client.post("/failing", json={"value": 1})
+            assert response.status_code == 500
+            assert "Something went wrong" in response.json()["detail"]
 
 
 class TestOpenAPIDocs:
+    """Tests for OpenAPI documentation."""
+
     def test_openapi_docs_available(self):
-        class MyEndpoint:
-            _jarvis_endpoint_name = "greeter"
+        clear_registry()
 
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+        @jarvis.app(name="Calculator")
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
 
-        app = create_app(MyEndpoint)
+        app = create_app(Calculator)
         client = TestClient(app)
 
         response = client.get("/docs")
         assert response.status_code == 200
 
-    def test_openapi_json_has_correct_schema(self):
-        class MyEndpoint:
-            _jarvis_endpoint_name = "greeter"
+    def test_openapi_json_has_all_endpoints(self):
+        clear_registry()
 
-            def run(self, input: Input) -> Output:
-                return Output(message=f"Hello, {input.name}!")
+        @jarvis.app(name="Calculator")
+        class Calculator:
+            @jarvis.endpoint()
+            def add(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a + input.b)
 
-        app = create_app(MyEndpoint)
+            @jarvis.endpoint()
+            def subtract(self, input: TwoNumbers) -> Result:
+                return Result(result=input.a - input.b)
+
+        app = create_app(Calculator)
         client = TestClient(app)
 
         response = client.get("/openapi.json")
         assert response.status_code == 200
 
         openapi = response.json()
-        assert openapi["info"]["title"] == "greeter"
-        assert "/" in openapi["paths"]
-        assert "post" in openapi["paths"]["/"]
+        assert openapi["info"]["title"] == "Calculator"
+        assert "/add" in openapi["paths"]
+        assert "/subtract" in openapi["paths"]
+        assert "post" in openapi["paths"]["/add"]
+        assert "post" in openapi["paths"]["/subtract"]
