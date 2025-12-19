@@ -1,7 +1,10 @@
 """Unit tests for the app and endpoint decorators."""
 
+import pytest
+
 import jarvis
-from jarvis.decorator import clear_registry, get_endpoint_methods, get_registered_apps
+from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
+from jarvis.exceptions import MultipleAppsError
 
 
 class TestAppDecorator:
@@ -9,7 +12,7 @@ class TestAppDecorator:
 
     def test_app_decorator_sets_jarvis_app_flag(self):
         """Test that the decorator sets _jarvis_app on the class."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -20,7 +23,7 @@ class TestAppDecorator:
 
     def test_app_decorator_sets_default_name(self):
         """Test that the decorator sets _jarvis_app_name to class name by default."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -31,7 +34,7 @@ class TestAppDecorator:
 
     def test_app_decorator_with_custom_name(self):
         """Test that the decorator accepts a custom name."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app(name="CustomName")
         class MyApp:
@@ -40,37 +43,36 @@ class TestAppDecorator:
         assert MyApp._jarvis_app_name == "CustomName"
 
     def test_app_decorator_registers_class(self):
-        """Test that the decorator registers the class in the registry."""
-        clear_registry()
+        """Test that the decorator registers the class."""
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
             pass
 
-        registered = get_registered_apps()
-        assert len(registered) == 1
-        assert registered[0] is MyApp
+        registered = get_registered_app()
+        assert registered is MyApp
 
-    def test_multiple_apps_registered(self):
-        """Test that multiple apps can be registered."""
-        clear_registry()
+    def test_multiple_apps_raises_error(self):
+        """Test that multiple apps raise MultipleAppsError."""
+        _reset_registry()
 
         @jarvis.app()
         class FirstApp:
             pass
 
-        @jarvis.app()
-        class SecondApp:
-            pass
+        with pytest.raises(MultipleAppsError) as exc_info:
+            @jarvis.app()
+            class SecondApp:
+                pass
 
-        registered = get_registered_apps()
-        assert len(registered) == 2
-        assert FirstApp in registered
-        assert SecondApp in registered
+        assert "Only one @jarvis.app()" in str(exc_info.value)
+        assert "FirstApp" in str(exc_info.value)
+        assert "SecondApp" in str(exc_info.value)
 
     def test_app_decorator_returns_original_class(self):
         """Test that the decorator returns the original class unchanged."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -86,7 +88,7 @@ class TestEndpointDecorator:
 
     def test_endpoint_decorator_sets_flag(self):
         """Test that the decorator sets _jarvis_endpoint on the method."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -100,7 +102,7 @@ class TestEndpointDecorator:
 
     def test_endpoint_decorator_default_path(self):
         """Test that the decorator sets default path from method name."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -113,7 +115,7 @@ class TestEndpointDecorator:
 
     def test_endpoint_decorator_custom_path(self):
         """Test that the decorator accepts a custom path."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -126,7 +128,7 @@ class TestEndpointDecorator:
 
     def test_multiple_endpoint_methods(self):
         """Test that multiple methods can be decorated as endpoints."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -150,7 +152,7 @@ class TestEndpointDecorator:
 
     def test_endpoint_preserves_method_name(self):
         """Test that functools.wraps preserves method name."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -163,7 +165,7 @@ class TestEndpointDecorator:
 
     def test_endpoint_preserves_docstring(self):
         """Test that functools.wraps preserves docstring."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -177,7 +179,7 @@ class TestEndpointDecorator:
 
     def test_non_endpoint_methods_not_included(self):
         """Test that non-decorated methods are not included."""
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -196,17 +198,17 @@ class TestEndpointDecorator:
         assert methods[0].__name__ == "endpoint_method"
 
 
-class TestClearRegistry:
-    """Tests for the clear_registry function."""
+class TestResetRegistry:
+    """Tests for the _reset_registry function."""
 
-    def test_clear_registry_empties_apps(self):
-        """Test that clear_registry empties the app registry."""
-        clear_registry()
+    def test_reset_registry_clears_app(self):
+        """Test that _reset_registry clears the registered app."""
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
             pass
 
-        assert len(get_registered_apps()) == 1
-        clear_registry()
-        assert len(get_registered_apps()) == 0
+        assert get_registered_app() is MyApp
+        _reset_registry()
+        assert get_registered_app() is None

@@ -100,7 +100,7 @@ class TestDevCommandValidation:
         import importlib.util
         import sys
 
-        from jarvis.decorator import clear_registry, get_endpoint_methods, get_registered_apps
+        from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
 
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
             code = b"""
@@ -127,17 +127,17 @@ class Calculator:
             temp_path = f.name
 
         try:
-            clear_registry()
+            _reset_registry()
             spec = importlib.util.spec_from_file_location("test_module", temp_path)
             module = importlib.util.module_from_spec(spec)
             sys.modules["test_module"] = module
             spec.loader.exec_module(module)
 
-            apps = get_registered_apps()
-            assert len(apps) == 1
-            assert apps[0]._jarvis_app_name == "Calculator"
+            app_cls = get_registered_app()
+            assert app_cls is not None
+            assert app_cls._jarvis_app_name == "Calculator"
 
-            methods = get_endpoint_methods(apps[0])
+            methods = get_endpoint_methods(app_cls)
             assert len(methods) == 2
         finally:
             Path(temp_path).unlink()

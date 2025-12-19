@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 import jarvis
-from jarvis.decorator import clear_registry
+from jarvis.decorator import _reset_registry
 from jarvis.exceptions import EndpointSetupError, EndpointValidationError
 from jarvis.server import create_app
 
@@ -31,7 +31,7 @@ class TestCreateApp:
     """Tests for creating FastAPI apps from Jarvis app classes."""
 
     def test_creates_fastapi_app(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -43,7 +43,7 @@ class TestCreateApp:
         assert app is not None
 
     def test_uses_app_name_as_title(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app(name="Calculator")
         class MyApp:
@@ -55,7 +55,7 @@ class TestCreateApp:
         assert app.title == "Calculator"
 
     def test_uses_class_name_as_default_title(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyCalculator:
@@ -78,7 +78,7 @@ class TestMultiRouteRegistration:
     """Tests for registering multiple endpoint routes."""
 
     def test_registers_multiple_routes(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -98,7 +98,7 @@ class TestMultiRouteRegistration:
         assert "/subtract" in paths
 
     def test_custom_paths_registered(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -123,7 +123,7 @@ class TestEndpointRoutes:
     """Tests for endpoint route functionality."""
 
     def test_post_to_add_endpoint(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -138,7 +138,7 @@ class TestEndpointRoutes:
             assert response.json() == {"result": 8}
 
     def test_post_to_subtract_endpoint(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -153,7 +153,7 @@ class TestEndpointRoutes:
             assert response.json() == {"result": 6}
 
     def test_multiple_endpoints_work_together(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -176,7 +176,7 @@ class TestEndpointRoutes:
             assert client.post("/multiply", json={"a": 4, "b": 3}).json() == {"result": 12}
 
     def test_invalid_input_returns_422(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -194,7 +194,7 @@ class TestSharedState:
     """Tests for shared state across endpoints."""
 
     def test_shared_instance_across_endpoints(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Counter:
@@ -221,7 +221,7 @@ class TestSharedState:
             assert response.json() == {"result": 8}
 
     def test_setup_initializes_shared_state(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class Calculator:
@@ -242,7 +242,7 @@ class TestSetupMethod:
     """Tests for the setup() method lifecycle."""
 
     def test_setup_is_called_on_startup(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -260,7 +260,7 @@ class TestSetupMethod:
             assert response.status_code == 200
 
     def test_app_without_setup_works(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -275,7 +275,7 @@ class TestSetupMethod:
             assert response.json() == {"result": 10}
 
     def test_setup_failure_prevents_startup(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -297,7 +297,7 @@ class TestErrorHandling:
     """Tests for error handling in endpoints."""
 
     def test_exception_in_endpoint_returns_500(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app()
         class MyApp:
@@ -316,7 +316,7 @@ class TestOpenAPIDocs:
     """Tests for OpenAPI documentation."""
 
     def test_openapi_docs_available(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app(name="Calculator")
         class Calculator:
@@ -331,7 +331,7 @@ class TestOpenAPIDocs:
         assert response.status_code == 200
 
     def test_openapi_json_has_all_endpoints(self):
-        clear_registry()
+        _reset_registry()
 
         @jarvis.app(name="Calculator")
         class Calculator:

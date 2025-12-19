@@ -17,3 +17,9 @@ class EndpointSetupError(JarvisError):
     """Raised when an endpoint's setup() method fails."""
 
     pass
+
+
+class MultipleAppsError(JarvisError):
+    """Raised when multiple @jarvis.app() classes are defined in a module."""
+
+    pass

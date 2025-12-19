@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 import jarvis
-from jarvis.decorator import clear_registry
+from jarvis.decorator import _reset_registry
 from jarvis.server import create_app
 
 
@@ -13,7 +13,7 @@ class TestCalculatorApp:
     """Integration test with the Calculator example from the issue."""
 
     def test_calculator_multi_endpoint_example(self):
-        clear_registry()
+        _reset_registry()
 
         class TwoNumbers(BaseModel):
             a: int
@@ -63,7 +63,7 @@ class TestMLApp:
     """Integration test with ML-like multi-endpoint app."""
 
     def test_text_analysis_app(self):
-        clear_registry()
+        _reset_registry()
 
         class TextInput(BaseModel):
             text: str
@@ -120,7 +120,7 @@ class TestSharedStateIntegration:
 
     def test_ml_model_shared_across_endpoints(self):
         """Simulate an ML app where a model is loaded once and used by multiple endpoints."""
-        clear_registry()
+        _reset_registry()
 
         class Input(BaseModel):
             value: float
@@ -174,7 +174,7 @@ class TestCustomPaths:
     """Integration tests for custom endpoint paths."""
 
     def test_custom_path_routing(self):
-        clear_registry()
+        _reset_registry()
 
         class NumberInput(BaseModel):
             n: int
@@ -209,7 +209,7 @@ class TestMinimalApp:
 
     def test_minimal_multi_endpoint_app(self):
         """Demonstrate that a functional multi-endpoint app can be concise."""
-        clear_registry()
+        _reset_registry()
 
         class In(BaseModel):
             x: int

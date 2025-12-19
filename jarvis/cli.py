@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 import uvicorn
 
-from jarvis.decorator import clear_registry, get_endpoint_methods, get_registered_apps
+from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
 from jarvis.server import create_app
 
 app = typer.Typer(
@@ -37,8 +37,8 @@ def dev(
         typer.echo(f"Error: File must be a Python file: {file}", err=True)
         raise typer.Exit(1)
 
-    # Clear any previously registered apps
-    clear_registry()
+    # Clear any previously registered app
+    _reset_registry()
 
     # Load the user's Python file
     spec = importlib.util.spec_from_file_location("user_module", file)
@@ -48,21 +48,25 @@ def dev(
 
     module = importlib.util.module_from_spec(spec)
     sys.modules["user_module"] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as e:
+        # Check if it's a MultipleAppsError
+        if "MultipleAppsError" in type(e).__name__ or "multiple" in str(e).lower():
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1)
+        # Re-raise other exceptions
+        raise
 
-    # Get registered apps
-    apps = get_registered_apps()
-    if not apps:
+    # Get the registered app
+    app_cls = get_registered_app()
+    if app_cls is None:
         typer.echo(
-            "Error: No apps found. Did you decorate a class with @jarvis.app()?",
+            "Error: No app found. Did you decorate a class with @jarvis.app()?",
             err=True,
         )
         raise typer.Exit(1)
 
-    if len(apps) > 1:
-        typer.echo("Warning: Multiple apps found. Using the first one.", err=True)
-
-    app_cls = apps[0]
     app_name = getattr(app_cls, "_jarvis_app_name", "app")
 
     # Get endpoint methods for display
