@@ -1,6 +1,7 @@
 """CLI implementation for Jarvis SDK."""
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import typer
 import uvicorn
 
 from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
+from jarvis.requirements import extract_requirements_from_file
 from jarvis.server import create_app
 
 app = typer.Typer(
@@ -36,6 +38,34 @@ def dev(
     if not file.suffix == ".py":
         typer.echo(f"Error: File must be a Python file: {file}", err=True)
         raise typer.Exit(1)
+
+    # Step 1: Extract requirements via AST (before importing to avoid import errors)
+    try:
+        requirements = extract_requirements_from_file(str(file))
+    except SyntaxError as e:
+        typer.echo(f"Error: Invalid Python syntax in {file}: {e}", err=True)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"Error: Failed to extract requirements from {file}: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Step 2: Install requirements with uv (shows output, fast if already satisfied)
+    if requirements:
+        typer.echo(f"Installing requirements: {', '.join(requirements)}")
+        try:
+            subprocess.run(
+                ["uv", "pip", "install", *requirements],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            typer.echo(f"Error: Failed to install requirements: {e}", err=True)
+            raise typer.Exit(1)
+        except FileNotFoundError:
+            typer.echo(
+                "Error: 'uv' command not found. Please install uv: https://github.com/astral-sh/uv",
+                err=True,
+            )
+            raise typer.Exit(1)
 
     # Clear any previously registered app
     _reset_registry()

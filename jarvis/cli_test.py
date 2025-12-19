@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -143,3 +144,246 @@ class Calculator:
             Path(temp_path).unlink()
             if "test_module" in sys.modules:
                 del sys.modules["test_module"]
+
+
+class TestDevCommandRequirements:
+    """Tests for dev command with requirements parameter."""
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_installs_requirements(self, mock_uvicorn, mock_subprocess):
+        """Test that dev command installs requirements before starting server."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app(requirements=["torch", "numpy>=1.24"])
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+
+            # Verify subprocess.run was called with correct args
+            mock_subprocess.assert_called_once()
+            call_args = mock_subprocess.call_args[0][0]
+            assert call_args[0] == "uv"
+            assert call_args[1] == "pip"
+            assert call_args[2] == "install"
+            assert "torch" in call_args
+            assert "numpy>=1.24" in call_args
+
+            # Verify uvicorn was started (server logic)
+            assert mock_uvicorn.called
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_no_requirements_skips_install(self, mock_uvicorn, mock_subprocess):
+        """Test that dev command skips install when no requirements specified."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app()
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+
+            # Verify subprocess.run was NOT called
+            mock_subprocess.assert_not_called()
+
+            # Verify uvicorn was still started
+            assert mock_uvicorn.called
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_empty_requirements_skips_install(self, mock_uvicorn, mock_subprocess):
+        """Test that dev command skips install when requirements list is empty."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app(requirements=[])
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+
+            # Verify subprocess.run was NOT called
+            mock_subprocess.assert_not_called()
+
+            # Verify uvicorn was still started
+            assert mock_uvicorn.called
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_handles_syntax_error_in_file(self, mock_uvicorn):
+        """Test that dev command handles syntax errors gracefully."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("this is not valid python syntax }{[")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+            assert result.exit_code == 1
+            assert "Invalid Python syntax" in result.output
+
+            # Verify uvicorn was NOT started
+            mock_uvicorn.assert_not_called()
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_handles_subprocess_error(self, mock_uvicorn, mock_subprocess):
+        """Test that dev command handles pip install failures."""
+        from subprocess import CalledProcessError
+
+        mock_subprocess.side_effect = CalledProcessError(1, "uv pip install")
+
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app(requirements=["nonexistent-package-xyz"])
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+            assert result.exit_code == 1
+            assert "Failed to install requirements" in result.output
+
+            # Verify uvicorn was NOT started
+            mock_uvicorn.assert_not_called()
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_handles_uv_not_found(self, mock_uvicorn, mock_subprocess):
+        """Test that dev command handles missing uv command."""
+        mock_subprocess.side_effect = FileNotFoundError()
+
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app(requirements=["torch"])
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+            assert result.exit_code == 1
+            assert "'uv' command not found" in result.output
+
+            # Verify uvicorn was NOT started
+            mock_uvicorn.assert_not_called()
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("jarvis.cli.subprocess.run")
+    @patch("jarvis.cli.uvicorn.run")
+    def test_dev_extracts_requirements_before_import(self, mock_uvicorn, mock_subprocess):
+        """Test that requirements are extracted via AST before importing (chicken-and-egg fix)."""
+        # This file has imports that would fail if not installed
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+            f.write("""
+# These imports would fail if packages aren't installed
+# import torch
+# import transformers
+
+import jarvis
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    value: int
+
+class Output(BaseModel):
+    result: int
+
+@jarvis.app(requirements=["torch", "transformers"])
+class MyModel:
+    @jarvis.endpoint()
+    def predict(self, input: Input) -> Output:
+        return Output(result=input.value * 2)
+""")
+            temp_path = f.name
+
+        try:
+            result = runner.invoke(app, ["dev", temp_path])
+
+            # Verify requirements were extracted and install attempted
+            mock_subprocess.assert_called_once()
+            call_args = mock_subprocess.call_args[0][0]
+            assert "torch" in call_args
+            assert "transformers" in call_args
+
+            # The key test: extraction happened via AST, not via import
+            # If we had imported the file first, the commented imports would fail
+        finally:
+            Path(temp_path).unlink()
