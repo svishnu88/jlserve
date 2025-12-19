@@ -82,6 +82,107 @@ class TestAppDecorator:
         instance = MyApp()
         assert instance.helper() == "hello"
 
+    def test_app_decorator_with_requirements(self):
+        """Test that the decorator accepts and stores requirements."""
+        _reset_registry()
+
+        @jarvis.app(requirements=["torch", "transformers==4.35.0", "numpy>=1.24"])
+        class MyApp:
+            pass
+
+        assert hasattr(MyApp, "_jarvis_requirements")
+        assert MyApp._jarvis_requirements == ["torch", "transformers==4.35.0", "numpy>=1.24"]
+
+    def test_app_decorator_with_empty_requirements(self):
+        """Test that the decorator handles empty requirements list."""
+        _reset_registry()
+
+        @jarvis.app(requirements=[])
+        class MyApp:
+            pass
+
+        assert hasattr(MyApp, "_jarvis_requirements")
+        assert MyApp._jarvis_requirements == []
+
+    def test_app_decorator_without_requirements(self):
+        """Test that the decorator sets empty list when requirements not provided."""
+        _reset_registry()
+
+        @jarvis.app()
+        class MyApp:
+            pass
+
+        assert hasattr(MyApp, "_jarvis_requirements")
+        assert MyApp._jarvis_requirements == []
+
+    def test_app_decorator_with_various_version_specifiers(self):
+        """Test that the decorator accepts various pip version specifier formats."""
+        _reset_registry()
+
+        @jarvis.app(
+            requirements=[
+                "torch",  # No version
+                "torch==2.0.0",  # Exact version
+                "numpy>=1.24",  # Minimum version
+                "pandas<3.0",  # Maximum version
+                "flask>=2.0,<3.0",  # Version range
+                "torch[cuda]",  # With extras
+                "transformers[torch]>=4.30",  # Extras + version
+            ]
+        )
+        class MyApp:
+            pass
+
+        assert len(MyApp._jarvis_requirements) == 7
+        assert "torch" in MyApp._jarvis_requirements
+        assert "transformers[torch]>=4.30" in MyApp._jarvis_requirements
+
+    def test_app_decorator_requirements_not_list_raises_error(self):
+        """Test that non-list requirements raises ValueError."""
+        _reset_registry()
+
+        with pytest.raises(ValueError) as exc_info:
+            @jarvis.app(requirements="torch")
+            class MyApp:
+                pass
+
+        assert "requirements must be a list" in str(exc_info.value)
+        assert "str" in str(exc_info.value)
+
+    def test_app_decorator_requirements_with_non_string_raises_error(self):
+        """Test that non-string items in requirements raises ValueError."""
+        _reset_registry()
+
+        with pytest.raises(ValueError) as exc_info:
+            @jarvis.app(requirements=["torch", 123, "numpy"])
+            class MyApp:
+                pass
+
+        assert "requirements[1] must be a string" in str(exc_info.value)
+        assert "int" in str(exc_info.value)
+
+    def test_app_decorator_requirements_with_empty_string_raises_error(self):
+        """Test that empty string in requirements raises ValueError."""
+        _reset_registry()
+
+        with pytest.raises(ValueError) as exc_info:
+            @jarvis.app(requirements=["torch", "", "numpy"])
+            class MyApp:
+                pass
+
+        assert "requirements[1] must be a non-empty string" in str(exc_info.value)
+
+    def test_app_decorator_requirements_with_whitespace_only_raises_error(self):
+        """Test that whitespace-only string in requirements raises ValueError."""
+        _reset_registry()
+
+        with pytest.raises(ValueError) as exc_info:
+            @jarvis.app(requirements=["torch", "   ", "numpy"])
+            class MyApp:
+                pass
+
+        assert "requirements[1] must be a non-empty string" in str(exc_info.value)
+
 
 class TestEndpointDecorator:
     """Tests for the @jarvis.endpoint() method decorator."""

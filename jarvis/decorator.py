@@ -9,7 +9,7 @@ from jarvis.exceptions import MultipleAppsError
 _registered_app: Optional[Type] = None
 
 
-def app(name: Optional[str] = None):
+def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
     """Decorator to mark a class as a Jarvis app.
 
     The app can contain multiple endpoint methods decorated with @endpoint().
@@ -19,12 +19,16 @@ def app(name: Optional[str] = None):
 
     Args:
         name: Optional custom name for the app. Defaults to the class name.
+        requirements: Optional list of Python dependency strings in pip format.
+            Each string should be a valid PEP 508 dependency specifier.
+            Examples: ["torch", "transformers==4.35.0", "numpy>=1.24"]
 
     Returns:
         A decorator function that registers the class as an app.
 
     Raises:
         MultipleAppsError: If another app class has already been registered.
+        ValueError: If requirements is not a list or contains non-string items.
     """
 
     def decorator(cls: Type) -> Type:
@@ -37,8 +41,25 @@ def app(name: Optional[str] = None):
                 f"For ML inference use cases, deploy each model as a separate app."
             )
 
+        # Validate requirements parameter
+        if requirements is not None:
+            if not isinstance(requirements, list):
+                raise ValueError(
+                    f"requirements must be a list, got {type(requirements).__name__}"
+                )
+            for i, req in enumerate(requirements):
+                if not isinstance(req, str):
+                    raise ValueError(
+                        f"requirements[{i}] must be a string, got {type(req).__name__}"
+                    )
+                if not req.strip():
+                    raise ValueError(
+                        f"requirements[{i}] must be a non-empty string"
+                    )
+
         cls._jarvis_app = True
         cls._jarvis_app_name = name if name else cls.__name__
+        cls._jarvis_requirements = requirements if requirements else []
         _registered_app = cls
         return cls
 
