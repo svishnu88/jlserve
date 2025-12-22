@@ -5,19 +5,19 @@ from pathlib import Path
 
 import pytest
 
-from jarvis.requirements import extract_requirements_from_file
+from jlserve.requirements import extract_requirements_from_file
 
 
 class TestExtractRequirementsFromFile:
     """Tests for extract_requirements_from_file function."""
 
-    def test_extract_requirements_with_jarvis_dot_app(self):
-        """Test extraction from @jarvis.app(requirements=[...]) pattern."""
+    def test_extract_requirements_with_jlserve_dot_app(self):
+        """Test extraction from @jlserve.app(requirements=[...]) pattern."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(requirements=["torch", "transformers==4.35.0", "numpy>=1.24"])
+@jlserve.app(requirements=["torch", "transformers==4.35.0", "numpy>=1.24"])
 class MyModel:
     pass
 """)
@@ -33,7 +33,7 @@ class MyModel:
         """Test extraction from @app(requirements=[...]) pattern."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-from jarvis import app
+from jlserve import app
 
 @app(requirements=["pandas", "scikit-learn>=1.0"])
 class MyModel:
@@ -51,9 +51,9 @@ class MyModel:
         """Test extraction when requirements list is empty."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(requirements=[])
+@jlserve.app(requirements=[])
 class MyModel:
     pass
 """)
@@ -69,9 +69,9 @@ class MyModel:
         """Test extraction when no requirements parameter is provided."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app()
+@jlserve.app()
 class MyModel:
     pass
 """)
@@ -84,7 +84,7 @@ class MyModel:
             Path(temp_path).unlink()
 
     def test_extract_requirements_no_decorator(self):
-        """Test extraction when no @jarvis.app() decorator is present."""
+        """Test extraction when no @jlserve.app() decorator is present."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
 class MyModel:
@@ -102,9 +102,9 @@ class MyModel:
         """Test extraction when both name and requirements are specified."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(name="CustomModel", requirements=["torch>=2.0"])
+@jlserve.app(name="CustomModel", requirements=["torch>=2.0"])
 class MyModel:
     pass
 """)
@@ -120,9 +120,9 @@ class MyModel:
         """Test extraction with various pip version specifier formats."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(requirements=[
+@jlserve.app(requirements=[
     "torch",
     "torch==2.0.0",
     "numpy>=1.24",
@@ -153,7 +153,7 @@ class MyModel:
 import torch  # This would fail if torch not installed
 import transformers  # This would fail too
 
-@jarvis.app(requirements=["torch", "transformers"])
+@jlserve.app(requirements=["torch", "transformers"])
 class MyModel:
     def predict(self):
         return torch.tensor([1, 2, 3])
@@ -168,12 +168,12 @@ class MyModel:
             Path(temp_path).unlink()
 
     def test_extract_requirements_multiple_classes_first_match(self):
-        """Test that extraction returns requirements from first @jarvis.app() class."""
+        """Test that extraction returns requirements from first @jlserve.app() class."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(requirements=["torch"])
+@jlserve.app(requirements=["torch"])
 class FirstModel:
     pass
 
@@ -192,13 +192,13 @@ class SecondModel:
         """Test extraction when class has multiple decorators."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
 def other_decorator(cls):
     return cls
 
 @other_decorator
-@jarvis.app(requirements=["numpy"])
+@jlserve.app(requirements=["numpy"])
 class MyModel:
     pass
 """)
@@ -231,9 +231,9 @@ class MyModel:
         """Test extraction with multiline requirements list."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(
+@jlserve.app(
     requirements=[
         "torch",
         "numpy",
@@ -256,9 +256,9 @@ class MyModel:
         # Note: This would fail at decorator validation time, but AST parsing should handle it
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 
-@jarvis.app(requirements=["torch", 123, None, "numpy"])
+@jlserve.app(requirements=["torch", 123, None, "numpy"])
 class MyModel:
     pass
 """)
@@ -278,10 +278,10 @@ class MyModel:
 # This is a comment
 \"\"\"This is a module docstring.\"\"\"
 
-import jarvis
+import jlserve
 
 # Another comment
-@jarvis.app(requirements=["torch"])  # inline comment
+@jlserve.app(requirements=["torch"])  # inline comment
 class MyModel:
     \"\"\"Class docstring.\"\"\"
     pass

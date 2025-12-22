@@ -1,10 +1,10 @@
-# Jarvis SDK
+# JLServe
 
 A simple Python framework for creating ML inference endpoints with minimal boilerplate.
 
 ## Features
 
-- **Simple API** - One decorator, one class, one method
+- **Simple API** - Decorator-based pattern for defining apps and endpoints
 - **Type-safe** - Pydantic models for input/output validation
 - **Developer-friendly** - IDE autocomplete, typo detection, auto-generated docs
 - **Fast startup** - Server ready in under 2 seconds
@@ -12,21 +12,21 @@ A simple Python framework for creating ML inference endpoints with minimal boile
 ## Installation
 
 ```bash
-pip install jarvis
+pip install jlserve
 ```
 
 Or with uv:
 
 ```bash
-uv add jarvis
+uv add jlserve
 ```
 
 ## Quick Start
 
-Create an endpoint in `app.py`:
+Create an app in `app.py`:
 
 ```python
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 
@@ -38,32 +38,35 @@ class Output(BaseModel):
     message: str
 
 
-@jarvis.endpoint(name="greeter")
+@jlserve.app()
 class Greeter:
     def setup(self):
         self.prefix = "Hello"
 
-    def run(self, input: Input) -> Output:
+    @jlserve.endpoint()
+    def greet(self, input: Input) -> Output:
         return Output(message=f"{self.prefix}, {input.name}!")
 ```
 
 Run the server:
 
 ```bash
-jarvis dev app.py
+jlserve dev app.py
 ```
 
 Output:
 
 ```
-Serving greeter at http://localhost:8000
+Serving Greeter at http://localhost:8000
 Docs at http://localhost:8000/docs
+
+Endpoints: POST /greet
 ```
 
 Test the endpoint:
 
 ```bash
-curl -X POST http://localhost:8000 \
+curl -X POST http://localhost:8000/greet \
   -H "Content-Type: application/json" \
   -d '{"name": "World"}'
 ```
@@ -76,32 +79,41 @@ Response:
 
 ## API Reference
 
-### `@jarvis.endpoint(name)`
+### `@jlserve.app()`
 
-Decorator that marks a class as a Jarvis endpoint.
+Decorator that marks a class as a JLServe app. Only one app per module/deployment.
 
 | Parameter | Type  | Required | Description              |
 |-----------|-------|----------|--------------------------|
-| `name`    | `str` | Yes      | Name of the endpoint     |
+| `name`    | `str` | No       | Custom name for the app. Defaults to class name. |
+| `requirements` | `list[str]` | No | Python dependencies to auto-install (e.g., `["torch", "transformers"]`) |
+
+### `@jlserve.endpoint()`
+
+Decorator that marks a method as an endpoint within the app class.
+
+| Parameter | Type  | Required | Description              |
+|-----------|-------|----------|--------------------------|
+| `path`    | `str` | No       | Custom route path. Defaults to "/" + method name. |
 
 ### Class Methods
 
 | Method            | Required | Description                                                                 |
 |-------------------|----------|-----------------------------------------------------------------------------|
 | `setup(self)`     | No       | Called once when server starts. Use for loading models, initializing resources. |
-| `run(self, input) -> output` | Yes | Handles incoming requests. Must have type hints for input and output. |
+| `<endpoint_method>(self, input) -> output` | Yes | Endpoint methods decorated with `@jlserve.endpoint()`. Must have type hints for input and output. |
 
 ### Input/Output Requirements
 
 - Input must be a Pydantic `BaseModel` subclass
 - Output must be a Pydantic `BaseModel` subclass
-- Type hints are required on the `run()` method
+- Type hints are required on endpoint methods
 
 ## CLI Reference
 
-### `jarvis dev <file>`
+### `jlserve dev <file>`
 
-Runs the endpoint locally for development.
+Runs the app locally for development.
 
 | Option   | Default | Description       |
 |----------|---------|-------------------|
@@ -110,7 +122,7 @@ Runs the endpoint locally for development.
 Example:
 
 ```bash
-jarvis dev app.py --port 3000
+jlserve dev app.py --port 3000
 ```
 
 ## Auto-Generated Features
@@ -125,16 +137,17 @@ jarvis dev app.py --port 3000
 
 | Error                        | Behavior                                              |
 |------------------------------|-------------------------------------------------------|
-| Missing `run()` method       | Error at startup: "Endpoint class must define a run() method" |
-| Missing type hints on `run()` | Error at startup: "run() must have type hints for input and output" |
+| No `@jlserve.app()` class    | Error at startup: "No app found. Did you decorate a class with @jlserve.app()?" |
+| No endpoint methods          | Error at startup: "App has no endpoints. Add methods decorated with @jlserve.endpoint()." |
+| Missing type hints on endpoint methods | Error at startup: Validation error with details |
 | Invalid input JSON           | 422 response with validation errors                   |
-| Exception in `run()`         | 500 response with error message                       |
+| Exception in endpoint method | 500 response with error message                       |
 | Exception in `setup()`       | Server fails to start with error message              |
 
 ## Example: ML Inference
 
 ```python
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 
@@ -147,13 +160,14 @@ class SentimentOutput(BaseModel):
     score: float
 
 
-@jarvis.endpoint(name="sentiment")
+@jlserve.app(requirements=["transformers"])
 class SentimentAnalyzer:
     def setup(self):
         from transformers import pipeline
         self.pipe = pipeline("sentiment-analysis")
 
-    def run(self, input: SentimentInput) -> SentimentOutput:
+    @jlserve.endpoint()
+    def analyze(self, input: SentimentInput) -> SentimentOutput:
         result = self.pipe(input.text)[0]
         return SentimentOutput(
             label=result["label"],

@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-import jarvis
-from jarvis.decorator import _reset_registry
-from jarvis.server import create_app
+import jlserve
+from jlserve.decorator import _reset_registry
+from jlserve.server import create_app
 
 
 class TestCalculatorApp:
@@ -22,17 +22,17 @@ class TestCalculatorApp:
         class Result(BaseModel):
             result: int
 
-        @jarvis.app()
+        @jlserve.app()
         class Calculator:
             def setup(self):
                 self.operation_count = 0
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 self.operation_count += 1
                 return Result(result=input.a + input.b)
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def subtract(self, input: TwoNumbers) -> Result:
                 self.operation_count += 1
                 return Result(result=input.a - input.b)
@@ -76,20 +76,20 @@ class TestMLApp:
             length: int
             word_count: int
 
-        @jarvis.app()
+        @jlserve.app()
         class TextAnalyzer:
             def setup(self):
                 # Mock ML model loading
                 self.sentiment_model = lambda text: ("POSITIVE", 0.95)
                 self.calls = 0
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def analyze_sentiment(self, input: TextInput) -> SentimentOutput:
                 self.calls += 1
                 label, score = self.sentiment_model(input.text)
                 return SentimentOutput(label=label, score=score)
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def get_length(self, input: TextInput) -> LengthOutput:
                 self.calls += 1
                 return LengthOutput(
@@ -132,7 +132,7 @@ class TestSharedStateIntegration:
             model_name: str
             predictions_made: int
 
-        @jarvis.app()
+        @jlserve.app()
         class MLService:
             def setup(self):
                 # Simulate loading a heavy ML model
@@ -141,13 +141,13 @@ class TestSharedStateIntegration:
                 self.bias = 1.0
                 self.predictions_made = 0
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def predict(self, input: Input) -> PredictionOutput:
                 self.predictions_made += 1
                 prediction = input.value * self.weight + self.bias
                 return PredictionOutput(prediction=prediction)
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def model_info(self, input: Input) -> ModelInfoOutput:
                 return ModelInfoOutput(
                     model_name=self.model_name,
@@ -182,17 +182,17 @@ class TestCustomPaths:
         class NumberOutput(BaseModel):
             result: int
 
-        @jarvis.app()
+        @jlserve.app()
         class MathOperations:
-            @jarvis.endpoint(path="/v1/double")
+            @jlserve.endpoint(path="/v1/double")
             def double(self, input: NumberInput) -> NumberOutput:
                 return NumberOutput(result=input.n * 2)
 
-            @jarvis.endpoint(path="/v1/triple")
+            @jlserve.endpoint(path="/v1/triple")
             def triple(self, input: NumberInput) -> NumberOutput:
                 return NumberOutput(result=input.n * 3)
 
-            @jarvis.endpoint(path="/v2/quadruple")
+            @jlserve.endpoint(path="/v2/quadruple")
             def quadruple(self, input: NumberInput) -> NumberOutput:
                 return NumberOutput(result=input.n * 4)
 
@@ -217,13 +217,13 @@ class TestMinimalApp:
         class Out(BaseModel):
             y: int
 
-        @jarvis.app()
+        @jlserve.app()
         class Math:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def double(self, i: In) -> Out:
                 return Out(y=i.x * 2)
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def square(self, i: In) -> Out:
                 return Out(y=i.x ** 2)
 

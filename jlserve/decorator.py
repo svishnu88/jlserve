@@ -1,20 +1,20 @@
-"""Decorators for defining Jarvis apps and endpoints."""
+"""Decorators for defining JLServe apps and endpoints."""
 
 import functools
 from typing import Callable, Optional, Type
 
-from jarvis.exceptions import MultipleAppsError
+from jlserve.exceptions import MultipleAppsError
 
 # Track the single app class for this module
 _registered_app: Optional[Type] = None
 
 
 def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
-    """Decorator to mark a class as a Jarvis app.
+    """Decorator to mark a class as a JLServe app.
 
     The app can contain multiple endpoint methods decorated with @endpoint().
 
-    Only one @jarvis.app() class is allowed per module/deployment. This matches
+    Only one @jlserve.app() class is allowed per module/deployment. This matches
     ML inference use cases where a single model is loaded per deployment.
 
     Args:
@@ -36,7 +36,7 @@ def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
 
         if _registered_app is not None:
             raise MultipleAppsError(
-                f"Only one @jarvis.app() class is allowed per module. "
+                f"Only one @jlserve.app() class is allowed per module. "
                 f"Found existing app '{_registered_app.__name__}' and attempted to register '{cls.__name__}'. "
                 f"For ML inference use cases, deploy each model as a separate app."
             )
@@ -57,9 +57,9 @@ def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
                         f"requirements[{i}] must be a non-empty string"
                     )
 
-        cls._jarvis_app = True
-        cls._jarvis_app_name = name if name else cls.__name__
-        cls._jarvis_requirements = requirements if requirements else []
+        cls._jlserve_app = True
+        cls._jlserve_app_name = name if name else cls.__name__
+        cls._jlserve_requirements = requirements if requirements else []
         _registered_app = cls
         return cls
 
@@ -67,7 +67,7 @@ def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
 
 
 def endpoint(path: Optional[str] = None):
-    """Decorator to mark a method as a Jarvis endpoint.
+    """Decorator to mark a method as a JLServe endpoint.
 
     The endpoint path is automatically derived from the method name unless
     a custom path is provided.
@@ -84,8 +84,8 @@ def endpoint(path: Optional[str] = None):
         def wrapper(*args, **kwargs):
             return method(*args, **kwargs)
 
-        wrapper._jarvis_endpoint = True
-        wrapper._jarvis_endpoint_path = path if path else f"/{method.__name__}"
+        wrapper._jlserve_endpoint = True
+        wrapper._jlserve_endpoint_path = path if path else f"/{method.__name__}"
         return wrapper
 
     return decorator
@@ -108,7 +108,7 @@ def get_endpoint_methods(cls: Type) -> list[Callable]:
     methods = []
     for attr_name in dir(cls):
         attr = getattr(cls, attr_name)
-        if callable(attr) and getattr(attr, "_jarvis_endpoint", False):
+        if callable(attr) and getattr(attr, "_jlserve_endpoint", False):
             methods.append(attr)
     return methods
 

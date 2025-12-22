@@ -1,6 +1,6 @@
-"""Example multi-endpoint Calculator app demonstrating Jarvis SDK usage."""
+"""Example multi-endpoint Calculator app demonstrating JLServe usage."""
 
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 
@@ -26,7 +26,7 @@ class SubtractOutput(BaseModel):
     result: float
 
 
-@jarvis.app()
+@jlserve.app()
 class Calculator:
     """A simple calculator with add and subtract operations.
 
@@ -40,13 +40,13 @@ class Calculator:
         """Initialize shared state. Called once on app startup."""
         self.operation_count = 0
 
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def add(self, input: AddInput) -> AddOutput:
         """Add two numbers together."""
         self.operation_count += 1
         return AddOutput(result=input.a + input.b)
 
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def subtract(self, input: SubtractInput) -> SubtractOutput:
         """Subtract b from a."""
         self.operation_count += 1

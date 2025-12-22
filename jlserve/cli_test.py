@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
-from jarvis.cli import app
+from jlserve.cli import app
 
 runner = CliRunner()
 
@@ -48,7 +48,7 @@ class TestDevCommand:
             Path(temp_path).unlink()
 
     def test_dev_no_app_found(self):
-        """Test error message when no @jarvis.app() decorated class is found."""
+        """Test error message when no @jlserve.app() decorated class is found."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
             f.write(b"# empty python file\nx = 1\n")
             temp_path = f.name
@@ -56,18 +56,18 @@ class TestDevCommand:
         try:
             result = runner.invoke(app, ["dev", temp_path])
             assert result.exit_code == 1
-            assert "No apps found" in result.output
-            assert "@jarvis.app()" in result.output
+            assert "No app found" in result.output
+            assert "@jlserve.app()" in result.output
         finally:
             Path(temp_path).unlink()
 
     def test_dev_app_with_no_endpoints(self):
-        """Test error message when app has no @jarvis.endpoint() methods."""
+        """Test error message when app has no @jlserve.endpoint() methods."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
             code = b"""
-import jarvis
+import jlserve
 
-@jarvis.app()
+@jlserve.app()
 class EmptyApp:
     pass
 """
@@ -78,7 +78,7 @@ class EmptyApp:
             result = runner.invoke(app, ["dev", temp_path])
             assert result.exit_code == 1
             assert "no endpoints" in result.output.lower()
-            assert "@jarvis.endpoint()" in result.output
+            assert "@jlserve.endpoint()" in result.output
         finally:
             Path(temp_path).unlink()
 
@@ -101,11 +101,11 @@ class TestDevCommandValidation:
         import importlib.util
         import sys
 
-        from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
+        from jlserve.decorator import _reset_registry, get_endpoint_methods, get_registered_app
 
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
             code = b"""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -114,13 +114,13 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app()
+@jlserve.app()
 class Calculator:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def add(self, input: Input) -> Output:
         return Output(result=input.value + 1)
 
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def subtract(self, input: Input) -> Output:
         return Output(result=input.value - 1)
 """
@@ -136,7 +136,7 @@ class Calculator:
 
             app_cls = get_registered_app()
             assert app_cls is not None
-            assert app_cls._jarvis_app_name == "Calculator"
+            assert app_cls._jlserve_app_name == "Calculator"
 
             methods = get_endpoint_methods(app_cls)
             assert len(methods) == 2
@@ -149,13 +149,13 @@ class Calculator:
 class TestDevCommandRequirements:
     """Tests for dev command with requirements parameter."""
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_installs_requirements(self, mock_uvicorn, mock_subprocess):
         """Test that dev command installs requirements before starting server."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -164,9 +164,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app(requirements=["torch", "numpy>=1.24"])
+@jlserve.app(requirements=["torch", "numpy>=1.24"])
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)
@@ -189,13 +189,13 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_no_requirements_skips_install(self, mock_uvicorn, mock_subprocess):
         """Test that dev command skips install when no requirements specified."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -204,9 +204,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app()
+@jlserve.app()
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)
@@ -223,13 +223,13 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_empty_requirements_skips_install(self, mock_uvicorn, mock_subprocess):
         """Test that dev command skips install when requirements list is empty."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -238,9 +238,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app(requirements=[])
+@jlserve.app(requirements=[])
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)
@@ -257,7 +257,7 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_handles_syntax_error_in_file(self, mock_uvicorn):
         """Test that dev command handles syntax errors gracefully."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
@@ -274,8 +274,8 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_handles_subprocess_error(self, mock_uvicorn, mock_subprocess):
         """Test that dev command handles pip install failures."""
         from subprocess import CalledProcessError
@@ -284,7 +284,7 @@ class MyModel:
 
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -293,9 +293,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app(requirements=["nonexistent-package-xyz"])
+@jlserve.app(requirements=["nonexistent-package-xyz"])
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)
@@ -311,15 +311,15 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_handles_uv_not_found(self, mock_uvicorn, mock_subprocess):
         """Test that dev command handles missing uv command."""
         mock_subprocess.side_effect = FileNotFoundError()
 
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -328,9 +328,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app(requirements=["torch"])
+@jlserve.app(requirements=["torch"])
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)
@@ -346,8 +346,8 @@ class MyModel:
         finally:
             Path(temp_path).unlink()
 
-    @patch("jarvis.cli.subprocess.run")
-    @patch("jarvis.cli.uvicorn.run")
+    @patch("jlserve.cli.subprocess.run")
+    @patch("jlserve.cli.uvicorn.run")
     def test_dev_extracts_requirements_before_import(self, mock_uvicorn, mock_subprocess):
         """Test that requirements are extracted via AST before importing (chicken-and-egg fix)."""
         # This file has imports that would fail if not installed
@@ -357,7 +357,7 @@ class MyModel:
 # import torch
 # import transformers
 
-import jarvis
+import jlserve
 from pydantic import BaseModel
 
 class Input(BaseModel):
@@ -366,9 +366,9 @@ class Input(BaseModel):
 class Output(BaseModel):
     result: int
 
-@jarvis.app(requirements=["torch", "transformers"])
+@jlserve.app(requirements=["torch", "transformers"])
 class MyModel:
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def predict(self, input: Input) -> Output:
         return Output(result=input.value * 2)
 """)

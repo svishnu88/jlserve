@@ -3,15 +3,15 @@
 import pytest
 from pydantic import BaseModel
 
-import jarvis
-from jarvis.decorator import _reset_registry
-from jarvis.exceptions import EndpointValidationError
-from jarvis.validator import (
+import jlserve
+from jlserve.decorator import _reset_registry
+from jlserve.exceptions import EndpointValidationError
+from jlserve.validator import (
     get_method_input_type,
     get_method_output_type,
     validate_app,
     validate_has_endpoint_methods,
-    validate_is_jarvis_app,
+    validate_is_jlserve_app,
     validate_method_input_is_pydantic_model,
     validate_method_output_is_pydantic_model,
     validate_method_type_hints,
@@ -28,26 +28,26 @@ class Output(BaseModel):
 
 
 class TestValidateIsJarvisApp:
-    """Tests for validate_is_jarvis_app function."""
+    """Tests for validate_is_jlserve_app function."""
 
     def test_valid_app_class(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        validate_is_jarvis_app(ValidApp)
+        validate_is_jlserve_app(ValidApp)
 
     def test_class_without_app_decorator(self):
         class NotAnApp:
             pass
 
         with pytest.raises(EndpointValidationError) as exc_info:
-            validate_is_jarvis_app(NotAnApp)
-        assert "must be decorated with @jarvis.app()" in str(exc_info.value)
+            validate_is_jlserve_app(NotAnApp)
+        assert "must be decorated with @jlserve.app()" in str(exc_info.value)
 
 
 class TestValidateHasEndpointMethods:
@@ -56,9 +56,9 @@ class TestValidateHasEndpointMethods:
     def test_app_with_endpoints(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
@@ -67,14 +67,14 @@ class TestValidateHasEndpointMethods:
     def test_app_without_endpoints(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class EmptyApp:
             def helper(self):
                 pass
 
         with pytest.raises(EndpointValidationError) as exc_info:
             validate_has_endpoint_methods(EmptyApp)
-        assert "must have at least one method decorated with @jarvis.endpoint()" in str(
+        assert "must have at least one method decorated with @jlserve.endpoint()" in str(
             exc_info.value
         )
 
@@ -85,13 +85,13 @@ class TestValidateMethodTypeHints:
     def test_valid_type_hints(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(ValidApp)
         validate_method_type_hints(methods[0])
@@ -99,13 +99,13 @@ class TestValidateMethodTypeHints:
     def test_missing_input_type_hint(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -115,13 +115,13 @@ class TestValidateMethodTypeHints:
     def test_missing_return_type_hint(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input):
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -131,13 +131,13 @@ class TestValidateMethodTypeHints:
     def test_no_input_parameter(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -151,13 +151,13 @@ class TestValidateMethodInputIsPydanticModel:
     def test_valid_pydantic_input(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(ValidApp)
         validate_method_input_is_pydantic_model(methods[0])
@@ -165,13 +165,13 @@ class TestValidateMethodInputIsPydanticModel:
     def test_input_is_not_pydantic_model(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: str) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -181,13 +181,13 @@ class TestValidateMethodInputIsPydanticModel:
     def test_input_is_dict(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: dict) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -201,13 +201,13 @@ class TestValidateMethodOutputIsPydanticModel:
     def test_valid_pydantic_output(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(ValidApp)
         validate_method_output_is_pydantic_model(methods[0])
@@ -215,13 +215,13 @@ class TestValidateMethodOutputIsPydanticModel:
     def test_output_is_not_pydantic_model(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> str:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -231,13 +231,13 @@ class TestValidateMethodOutputIsPydanticModel:
     def test_output_is_dict(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> dict:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(InvalidApp)
         with pytest.raises(EndpointValidationError) as exc_info:
@@ -251,13 +251,13 @@ class TestValidateNoDuplicatePaths:
     def test_unique_paths(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def add(self, input: Input) -> Output:
                 pass
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def subtract(self, input: Input) -> Output:
                 pass
 
@@ -270,13 +270,13 @@ class TestValidateNoDuplicatePaths:
     def test_duplicate_custom_paths(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint(path="/same")
+            @jlserve.endpoint(path="/same")
             def method1(self, input: Input) -> Output:
                 pass
 
-            @jarvis.endpoint(path="/same")
+            @jlserve.endpoint(path="/same")
             def method2(self, input: Input) -> Output:
                 pass
 
@@ -291,13 +291,13 @@ class TestValidateApp:
     def test_valid_app(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def add(self, input: Input) -> Output:
                 return Output(result=input.value + 1)
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def subtract(self, input: Input) -> Output:
                 return Output(result=input.value - 1)
 
@@ -306,12 +306,12 @@ class TestValidateApp:
     def test_valid_app_with_setup(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class ValidApp:
             def setup(self):
                 self.multiplier = 2
 
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def multiply(self, input: Input) -> Output:
                 return Output(result=input.value * self.multiplier)
 
@@ -328,7 +328,7 @@ class TestValidateApp:
     def test_invalid_app_no_endpoints(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class EmptyApp:
             pass
 
@@ -338,9 +338,9 @@ class TestValidateApp:
     def test_invalid_app_bad_type_hints(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class InvalidApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: str) -> str:
                 pass
 
@@ -354,13 +354,13 @@ class TestGetMethodTypes:
     def test_get_method_input_type(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class MyApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(MyApp)
         assert get_method_input_type(methods[0]) is Input
@@ -368,13 +368,13 @@ class TestGetMethodTypes:
     def test_get_method_output_type(self):
         _reset_registry()
 
-        @jarvis.app()
+        @jlserve.app()
         class MyApp:
-            @jarvis.endpoint()
+            @jlserve.endpoint()
             def my_method(self, input: Input) -> Output:
                 pass
 
-        from jarvis.decorator import get_endpoint_methods
+        from jlserve.decorator import get_endpoint_methods
 
         methods = get_endpoint_methods(MyApp)
         assert get_method_output_type(methods[0]) is Output

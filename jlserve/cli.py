@@ -1,4 +1,4 @@
-"""CLI implementation for Jarvis SDK."""
+"""CLI implementation for JLServe."""
 
 import importlib.util
 import subprocess
@@ -8,12 +8,12 @@ from pathlib import Path
 import typer
 import uvicorn
 
-from jarvis.decorator import _reset_registry, get_endpoint_methods, get_registered_app
-from jarvis.requirements import extract_requirements_from_file
-from jarvis.server import create_app
+from jlserve.decorator import _reset_registry, get_endpoint_methods, get_registered_app
+from jlserve.requirements import extract_requirements_from_file
+from jlserve.server import create_app
 
 app = typer.Typer(
-    help="Jarvis SDK - A simple framework for creating ML endpoints",
+    help="JLServe - A simple framework for creating ML endpoints",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -21,7 +21,7 @@ app = typer.Typer(
 
 @app.callback()
 def callback() -> None:
-    """Jarvis SDK - A simple framework for creating ML endpoints."""
+    """JLServe - A simple framework for creating ML endpoints."""
     pass
 
 
@@ -92,18 +92,18 @@ def dev(
     app_cls = get_registered_app()
     if app_cls is None:
         typer.echo(
-            "Error: No app found. Did you decorate a class with @jarvis.app()?",
+            "Error: No app found. Did you decorate a class with @jlserve.app()?",
             err=True,
         )
         raise typer.Exit(1)
 
-    app_name = getattr(app_cls, "_jarvis_app_name", "app")
+    app_name = getattr(app_cls, "_jlserve_app_name", "app")
 
     # Get endpoint methods for display
     endpoint_methods = get_endpoint_methods(app_cls)
     if not endpoint_methods:
         typer.echo(
-            f"Error: App {app_name} has no endpoints. Add methods decorated with @jarvis.endpoint().",
+            f"Error: App {app_name} has no endpoints. Add methods decorated with @jlserve.endpoint().",
             err=True,
         )
         raise typer.Exit(1)
@@ -116,7 +116,7 @@ def dev(
     typer.echo(f"Docs at http://localhost:{port}/docs\n")
 
     # Print all available endpoints
-    routes = [f"POST {m._jarvis_endpoint_path}" for m in endpoint_methods]
+    routes = [f"POST {m._jlserve_endpoint_path}" for m in endpoint_methods]
     typer.echo(f"Endpoints: {', '.join(routes)}\n")
 
     # Start Uvicorn server

@@ -1,6 +1,6 @@
-"""Example Flux-Schnell image generation app using Jarvis SDK."""
+"""Example Flux-Schnell image generation app using JLServe."""
 
-import jarvis
+import jlserve
 from pydantic import BaseModel
 import base64
 from io import BytesIO
@@ -21,10 +21,10 @@ class PromptOutput(BaseModel):
     format: str = "png"
 
 
-@jarvis.app(requirements=["diffusers", 
-                          "transformers", 
-                          "accelerate", 
-                          "protobuf", 
+@jlserve.app(requirements=["diffusers",
+                          "transformers",
+                          "accelerate",
+                          "protobuf",
                           "sentencepiece"])
 class FluxSchnell:
     """Flux-Schnell image generation model.
@@ -43,7 +43,7 @@ class FluxSchnell:
         ).to("cuda")
         
 
-    @jarvis.endpoint()
+    @jlserve.endpoint()
     def generate(self, input: PromptInput) -> PromptOutput:
         """Generate an image from a text prompt."""
         # Generate image using Flux-Schnell pipeline

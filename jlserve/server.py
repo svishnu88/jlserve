@@ -1,4 +1,4 @@
-"""FastAPI server integration for Jarvis apps."""
+"""FastAPI server integration for JLServe apps."""
 
 from contextlib import asynccontextmanager
 from typing import Callable, Type
@@ -6,16 +6,16 @@ from typing import Callable, Type
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from jarvis.decorator import get_endpoint_methods
-from jarvis.exceptions import EndpointSetupError
-from jarvis.validator import get_method_input_type, get_method_output_type, validate_app
+from jlserve.decorator import get_endpoint_methods
+from jlserve.exceptions import EndpointSetupError
+from jlserve.validator import get_method_input_type, get_method_output_type, validate_app
 
 
 def create_app(app_cls: Type) -> FastAPI:
-    """Create a FastAPI app from a Jarvis app class.
+    """Create a FastAPI app from a JLServe app class.
 
     Args:
-        app_cls: The app class decorated with @jarvis.app().
+        app_cls: The app class decorated with @jlserve.app().
 
     Returns:
         A configured FastAPI application with routes for all endpoints.
@@ -26,7 +26,7 @@ def create_app(app_cls: Type) -> FastAPI:
     """
     validate_app(app_cls)
 
-    app_name = getattr(app_cls, "_jarvis_app_name", "app")
+    app_name = getattr(app_cls, "_jlserve_app_name", "app")
     endpoint_methods = get_endpoint_methods(app_cls)
 
     # Create the app instance once - shared across all endpoints
@@ -60,7 +60,7 @@ def _register_endpoint_route(fastapi_app: FastAPI, method: Callable, app_instanc
         method: The endpoint method to create a route for.
         app_instance: The shared app instance to call methods on.
     """
-    path = method._jarvis_endpoint_path
+    path = method._jlserve_endpoint_path
     input_type = get_method_input_type(method)
     output_type = get_method_output_type(method)
     method_name = method.__name__
