@@ -11,7 +11,7 @@ from jlserve.validator import (
     get_method_output_type,
     validate_app,
     validate_has_endpoint_methods,
-    validate_is_jarvis_app,
+    validate_is_jlserve_app,
     validate_method_input_is_pydantic_model,
     validate_method_output_is_pydantic_model,
     validate_method_type_hints,
@@ -28,7 +28,7 @@ class Output(BaseModel):
 
 
 class TestValidateIsJarvisApp:
-    """Tests for validate_is_jarvis_app function."""
+    """Tests for validate_is_jlserve_app function."""
 
     def test_valid_app_class(self):
         _reset_registry()
@@ -39,14 +39,14 @@ class TestValidateIsJarvisApp:
             def my_method(self, input: Input) -> Output:
                 pass
 
-        validate_is_jarvis_app(ValidApp)
+        validate_is_jlserve_app(ValidApp)
 
     def test_class_without_app_decorator(self):
         class NotAnApp:
             pass
 
         with pytest.raises(EndpointValidationError) as exc_info:
-            validate_is_jarvis_app(NotAnApp)
+            validate_is_jlserve_app(NotAnApp)
         assert "must be decorated with @jlserve.app()" in str(exc_info.value)
 
 

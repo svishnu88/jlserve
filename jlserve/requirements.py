@@ -29,12 +29,12 @@ def extract_requirements_from_file(file_path: str) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
             for decorator in node.decorator_list:
-                if _is_jarvis_app_decorator(decorator):
+                if _is_jlserve_app_decorator(decorator):
                     return _extract_requirements_arg(decorator)
     return []
 
 
-def _is_jarvis_app_decorator(decorator: ast.expr) -> bool:
+def _is_jlserve_app_decorator(decorator: ast.expr) -> bool:
     """Check if decorator is @jarvis.app or @app.
 
     Handles both import styles:

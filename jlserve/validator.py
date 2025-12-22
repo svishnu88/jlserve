@@ -18,19 +18,19 @@ def validate_app(cls: Type) -> None:
     Raises:
         EndpointValidationError: If validation fails.
     """
-    validate_is_jarvis_app(cls)
+    validate_is_jlserve_app(cls)
     validate_has_endpoint_methods(cls)
     validate_endpoint_methods(cls)
     validate_no_duplicate_paths(cls)
 
 
-def validate_is_jarvis_app(cls: Type) -> None:
+def validate_is_jlserve_app(cls: Type) -> None:
     """Check that the class is decorated with @jlserve.app().
 
     Raises:
         EndpointValidationError: If the class is not a JLServe app.
     """
-    if not getattr(cls, "_jarvis_app", False):
+    if not getattr(cls, "_jlserve_app", False):
         raise EndpointValidationError(
             f"Class {cls.__name__} must be decorated with @jlserve.app()"
         )
@@ -134,7 +134,7 @@ def validate_no_duplicate_paths(cls: Type) -> None:
     methods = get_endpoint_methods(cls)
     paths = {}
     for method in methods:
-        path = method._jarvis_endpoint_path
+        path = method._jlserve_endpoint_path
         if path in paths:
             raise EndpointValidationError(
                 f"Duplicate endpoint path '{path}' found in methods {paths[path]}() and {method.__name__}()"

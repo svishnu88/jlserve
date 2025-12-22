@@ -136,7 +136,7 @@ class Calculator:
 
             app_cls = get_registered_app()
             assert app_cls is not None
-            assert app_cls._jarvis_app_name == "Calculator"
+            assert app_cls._jlserve_app_name == "Calculator"
 
             methods = get_endpoint_methods(app_cls)
             assert len(methods) == 2

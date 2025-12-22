@@ -97,7 +97,7 @@ def dev(
         )
         raise typer.Exit(1)
 
-    app_name = getattr(app_cls, "_jarvis_app_name", "app")
+    app_name = getattr(app_cls, "_jlserve_app_name", "app")
 
     # Get endpoint methods for display
     endpoint_methods = get_endpoint_methods(app_cls)
@@ -116,7 +116,7 @@ def dev(
     typer.echo(f"Docs at http://localhost:{port}/docs\n")
 
     # Print all available endpoints
-    routes = [f"POST {m._jarvis_endpoint_path}" for m in endpoint_methods]
+    routes = [f"POST {m._jlserve_endpoint_path}" for m in endpoint_methods]
     typer.echo(f"Endpoints: {', '.join(routes)}\n")
 
     # Start Uvicorn server

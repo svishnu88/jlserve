@@ -10,27 +10,27 @@ from jlserve.exceptions import MultipleAppsError
 class TestAppDecorator:
     """Tests for the @jlserve.app() class decorator."""
 
-    def test_app_decorator_sets_jarvis_app_flag(self):
-        """Test that the decorator sets _jarvis_app on the class."""
+    def test_app_decorator_sets_jlserve_app_flag(self):
+        """Test that the decorator sets _jlserve_app on the class."""
         _reset_registry()
 
         @jlserve.app()
         class MyApp:
             pass
 
-        assert hasattr(MyApp, "_jarvis_app")
-        assert MyApp._jarvis_app is True
+        assert hasattr(MyApp, "_jlserve_app")
+        assert MyApp._jlserve_app is True
 
     def test_app_decorator_sets_default_name(self):
-        """Test that the decorator sets _jarvis_app_name to class name by default."""
+        """Test that the decorator sets _jlserve_app_name to class name by default."""
         _reset_registry()
 
         @jlserve.app()
         class MyApp:
             pass
 
-        assert hasattr(MyApp, "_jarvis_app_name")
-        assert MyApp._jarvis_app_name == "MyApp"
+        assert hasattr(MyApp, "_jlserve_app_name")
+        assert MyApp._jlserve_app_name == "MyApp"
 
     def test_app_decorator_with_custom_name(self):
         """Test that the decorator accepts a custom name."""
@@ -40,7 +40,7 @@ class TestAppDecorator:
         class MyApp:
             pass
 
-        assert MyApp._jarvis_app_name == "CustomName"
+        assert MyApp._jlserve_app_name == "CustomName"
 
     def test_app_decorator_registers_class(self):
         """Test that the decorator registers the class."""
@@ -90,8 +90,8 @@ class TestAppDecorator:
         class MyApp:
             pass
 
-        assert hasattr(MyApp, "_jarvis_requirements")
-        assert MyApp._jarvis_requirements == ["torch", "transformers==4.35.0", "numpy>=1.24"]
+        assert hasattr(MyApp, "_jlserve_requirements")
+        assert MyApp._jlserve_requirements == ["torch", "transformers==4.35.0", "numpy>=1.24"]
 
     def test_app_decorator_with_empty_requirements(self):
         """Test that the decorator handles empty requirements list."""
@@ -101,8 +101,8 @@ class TestAppDecorator:
         class MyApp:
             pass
 
-        assert hasattr(MyApp, "_jarvis_requirements")
-        assert MyApp._jarvis_requirements == []
+        assert hasattr(MyApp, "_jlserve_requirements")
+        assert MyApp._jlserve_requirements == []
 
     def test_app_decorator_without_requirements(self):
         """Test that the decorator sets empty list when requirements not provided."""
@@ -112,8 +112,8 @@ class TestAppDecorator:
         class MyApp:
             pass
 
-        assert hasattr(MyApp, "_jarvis_requirements")
-        assert MyApp._jarvis_requirements == []
+        assert hasattr(MyApp, "_jlserve_requirements")
+        assert MyApp._jlserve_requirements == []
 
     def test_app_decorator_with_various_version_specifiers(self):
         """Test that the decorator accepts various pip version specifier formats."""
@@ -133,9 +133,9 @@ class TestAppDecorator:
         class MyApp:
             pass
 
-        assert len(MyApp._jarvis_requirements) == 7
-        assert "torch" in MyApp._jarvis_requirements
-        assert "transformers[torch]>=4.30" in MyApp._jarvis_requirements
+        assert len(MyApp._jlserve_requirements) == 7
+        assert "torch" in MyApp._jlserve_requirements
+        assert "transformers[torch]>=4.30" in MyApp._jlserve_requirements
 
     def test_app_decorator_requirements_not_list_raises_error(self):
         """Test that non-list requirements raises ValueError."""
@@ -188,7 +188,7 @@ class TestEndpointDecorator:
     """Tests for the @jlserve.endpoint() method decorator."""
 
     def test_endpoint_decorator_sets_flag(self):
-        """Test that the decorator sets _jarvis_endpoint on the method."""
+        """Test that the decorator sets _jlserve_endpoint on the method."""
         _reset_registry()
 
         @jlserve.app()
@@ -199,7 +199,7 @@ class TestEndpointDecorator:
 
         methods = get_endpoint_methods(MyApp)
         assert len(methods) == 1
-        assert methods[0]._jarvis_endpoint is True
+        assert methods[0]._jlserve_endpoint is True
 
     def test_endpoint_decorator_default_path(self):
         """Test that the decorator sets default path from method name."""
@@ -212,7 +212,7 @@ class TestEndpointDecorator:
                 pass
 
         methods = get_endpoint_methods(MyApp)
-        assert methods[0]._jarvis_endpoint_path == "/add"
+        assert methods[0]._jlserve_endpoint_path == "/add"
 
     def test_endpoint_decorator_custom_path(self):
         """Test that the decorator accepts a custom path."""
@@ -225,7 +225,7 @@ class TestEndpointDecorator:
                 pass
 
         methods = get_endpoint_methods(MyApp)
-        assert methods[0]._jarvis_endpoint_path == "/custom-path"
+        assert methods[0]._jlserve_endpoint_path == "/custom-path"
 
     def test_multiple_endpoint_methods(self):
         """Test that multiple methods can be decorated as endpoints."""
@@ -248,7 +248,7 @@ class TestEndpointDecorator:
         methods = get_endpoint_methods(MyApp)
         assert len(methods) == 3
 
-        paths = {m._jarvis_endpoint_path for m in methods}
+        paths = {m._jlserve_endpoint_path for m in methods}
         assert paths == {"/add", "/subtract", "/mult"}
 
     def test_endpoint_preserves_method_name(self):

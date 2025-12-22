@@ -11,7 +11,7 @@ from jlserve.requirements import extract_requirements_from_file
 class TestExtractRequirementsFromFile:
     """Tests for extract_requirements_from_file function."""
 
-    def test_extract_requirements_with_jarvis_dot_app(self):
+    def test_extract_requirements_with_jlserve_dot_app(self):
         """Test extraction from @jlserve.app(requirements=[...]) pattern."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
             f.write("""

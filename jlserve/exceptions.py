@@ -1,25 +1,25 @@
-"""Custom exception classes for Jarvis SDK."""
+"""Custom exception classes for JLServe."""
 
 
-class JarvisError(Exception):
-    """Base exception for all Jarvis errors."""
+class JLServeError(Exception):
+    """Base exception for all JLServe errors."""
 
     pass
 
 
-class EndpointValidationError(JarvisError):
+class EndpointValidationError(JLServeError):
     """Raised when an endpoint class fails validation."""
 
     pass
 
 
-class EndpointSetupError(JarvisError):
+class EndpointSetupError(JLServeError):
     """Raised when an endpoint's setup() method fails."""
 
     pass
 
 
-class MultipleAppsError(JarvisError):
-    """Raised when multiple @jarvis.app() classes are defined in a module."""
+class MultipleAppsError(JLServeError):
+    """Raised when multiple @jlserve.app() classes are defined in a module."""
 
     pass

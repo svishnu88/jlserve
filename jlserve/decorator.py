@@ -57,9 +57,9 @@ def app(name: Optional[str] = None, requirements: Optional[list[str]] = None):
                         f"requirements[{i}] must be a non-empty string"
                     )
 
-        cls._jarvis_app = True
-        cls._jarvis_app_name = name if name else cls.__name__
-        cls._jarvis_requirements = requirements if requirements else []
+        cls._jlserve_app = True
+        cls._jlserve_app_name = name if name else cls.__name__
+        cls._jlserve_requirements = requirements if requirements else []
         _registered_app = cls
         return cls
 
@@ -84,8 +84,8 @@ def endpoint(path: Optional[str] = None):
         def wrapper(*args, **kwargs):
             return method(*args, **kwargs)
 
-        wrapper._jarvis_endpoint = True
-        wrapper._jarvis_endpoint_path = path if path else f"/{method.__name__}"
+        wrapper._jlserve_endpoint = True
+        wrapper._jlserve_endpoint_path = path if path else f"/{method.__name__}"
         return wrapper
 
     return decorator
@@ -108,7 +108,7 @@ def get_endpoint_methods(cls: Type) -> list[Callable]:
     methods = []
     for attr_name in dir(cls):
         attr = getattr(cls, attr_name)
-        if callable(attr) and getattr(attr, "_jarvis_endpoint", False):
+        if callable(attr) and getattr(attr, "_jlserve_endpoint", False):
             methods.append(attr)
     return methods
 

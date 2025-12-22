@@ -26,7 +26,7 @@ def create_app(app_cls: Type) -> FastAPI:
     """
     validate_app(app_cls)
 
-    app_name = getattr(app_cls, "_jarvis_app_name", "app")
+    app_name = getattr(app_cls, "_jlserve_app_name", "app")
     endpoint_methods = get_endpoint_methods(app_cls)
 
     # Create the app instance once - shared across all endpoints
@@ -60,7 +60,7 @@ def _register_endpoint_route(fastapi_app: FastAPI, method: Callable, app_instanc
         method: The endpoint method to create a route for.
         app_instance: The shared app instance to call methods on.
     """
-    path = method._jarvis_endpoint_path
+    path = method._jlserve_endpoint_path
     input_type = get_method_input_type(method)
     output_type = get_method_output_type(method)
     method_name = method.__name__
