@@ -4,12 +4,31 @@ version = "0.1.0"
 description = "A simple framework for creating ML endpoints"
 readme = "README.md"
 requires-python = ">=3.10"
+authors = [{name = "Vishnu Subramanian", email = "vishnu@jarvislabs.ai"}]
+license = {text = "MIT"}
+keywords = ["ml", "inference", "fastapi", "endpoints", "machine-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
     "uvicorn>=0.32.0",
     "typer>=0.15.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/svishnu88/jlserve"
+Repository = "https://github.com/svishnu88/jlserve"
+Issues = "https://github.com/svishnu88/jlserve/issues"
 
 [project.scripts]
 jlserve = "jlserve.cli:app"
