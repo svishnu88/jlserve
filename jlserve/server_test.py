@@ -35,6 +35,12 @@ class TestCreateApp:
 
         @jlserve.app()
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def process(self, input: Input) -> Output:
                 return Output(result=input.value * 2)
@@ -47,6 +53,12 @@ class TestCreateApp:
 
         @jlserve.app(name="Calculator")
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -59,6 +71,12 @@ class TestCreateApp:
 
         @jlserve.app()
         class MyCalculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -82,6 +100,12 @@ class TestMultiRouteRegistration:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -102,6 +126,12 @@ class TestMultiRouteRegistration:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint(path="/plus")
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -127,6 +157,12 @@ class TestEndpointRoutes:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -142,6 +178,12 @@ class TestEndpointRoutes:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def subtract(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a - input.b)
@@ -157,6 +199,12 @@ class TestEndpointRoutes:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -180,6 +228,12 @@ class TestEndpointRoutes:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -198,6 +252,12 @@ class TestSharedState:
 
         @jlserve.app()
         class Counter:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def __init__(self):
                 self.count = 0
 
@@ -225,6 +285,12 @@ class TestSharedState:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 self.multiplier = 10
 
@@ -246,6 +312,12 @@ class TestSetupMethod:
 
         @jlserve.app()
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 self.prefix = "Processed"
 
@@ -264,6 +336,12 @@ class TestSetupMethod:
 
         @jlserve.app()
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def process(self, input: Input) -> Output:
                 return Output(result=input.value * 2)
@@ -279,6 +357,12 @@ class TestSetupMethod:
 
         @jlserve.app()
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 raise RuntimeError("Setup failed!")
 
@@ -301,6 +385,12 @@ class TestErrorHandling:
 
         @jlserve.app()
         class MyApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def failing(self, input: Input) -> Output:
                 raise ValueError("Something went wrong")
@@ -320,6 +410,12 @@ class TestOpenAPIDocs:
 
         @jlserve.app(name="Calculator")
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)
@@ -335,6 +431,12 @@ class TestOpenAPIDocs:
 
         @jlserve.app(name="Calculator")
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: TwoNumbers) -> Result:
                 return Result(result=input.a + input.b)

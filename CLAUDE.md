@@ -55,3 +55,48 @@ class MyModel:
 - All endpoint inputs/outputs must be Pydantic BaseModel subclasses
 - Endpoint methods require type hints for both input parameter and return type
 - The app instance is created once and reused across all requests
+
+## Testing Philosophy
+
+JLServe follows a **pragmatic testing approach** that focuses on testing business logic, not standard library wrappers:
+
+### What to Test
+- ✅ **Business logic** - Validation rules, error handling, custom behavior
+- ✅ **Integration points** - How components work together (CLI → config → server)
+- ✅ **Edge cases** - Error conditions, missing inputs, invalid configurations
+- ✅ **Public APIs** - Functions/classes that users interact with
+
+### What NOT to Test
+- ❌ **Simple getters/setters** - Wrappers around `os.getenv()`, `Path()`, etc.
+- ❌ **Standard library behavior** - Testing that `Path.exists()` works
+- ❌ **Trivial forwarding** - Functions that just call another function without logic
+
+### Example
+
+```python
+# DON'T test this (simple wrapper)
+def get_cache_dir_str() -> str:
+    return os.getenv("JLSERVE_CACHE_DIR")
+
+# DO test this (business logic + validation)
+def get_jlserve_cache_dir() -> Path:
+    cache_dir_str = os.getenv("JLSERVE_CACHE_DIR")
+    if not cache_dir_str:
+        raise CacheConfigError("JLSERVE_CACHE_DIR must be set")
+    cache_dir = Path(cache_dir_str)
+    if not cache_dir.exists():
+        raise CacheConfigError(f"Directory does not exist: {cache_dir}")
+    return cache_dir
+```
+
+### Benefits
+- Tests remain focused and maintainable
+- Faster test execution
+- Clearer signal when tests fail (business logic issue, not stdlib)
+
+## Code Quality Best Practices
+
+### DRY Principle (Don't Repeat Yourself)
+
+Always look for code duplication and refactor to shared helpers when you see the same logic repeated:
+

@@ -22,6 +22,8 @@ def validate_app(cls: Type) -> None:
     validate_has_endpoint_methods(cls)
     validate_endpoint_methods(cls)
     validate_no_duplicate_paths(cls)
+    validate_setup_method(cls)
+    validate_download_weights_method(cls)
 
 
 def validate_is_jlserve_app(cls: Type) -> None:
@@ -177,3 +179,59 @@ def get_method_output_type(method: Callable) -> Type[BaseModel]:
     """
     hints = get_type_hints(method)
     return hints["return"]
+
+
+def _validate_lifecycle_method(cls: Type, method_name: str) -> None:
+    """Validate that a lifecycle method exists and has correct signature.
+
+    Args:
+        cls: The app class to validate.
+        method_name: Name of the lifecycle method (e.g., 'setup', 'download_weights').
+
+    Raises:
+        EndpointValidationError: If method is missing or has wrong signature.
+    """
+    if not hasattr(cls, method_name):
+        raise EndpointValidationError(
+            f"App {cls.__name__} must define a {method_name}() method"
+        )
+
+    method = getattr(cls, method_name)
+
+    if not callable(method):
+        raise EndpointValidationError(
+            f"{method_name} must be a method in {cls.__name__}, got {type(method).__name__}"
+        )
+
+    sig = inspect.signature(method)
+    params = list(sig.parameters.keys())
+
+    if params != ["self"]:
+        raise EndpointValidationError(
+            f"{method_name}() in {cls.__name__} must only accept 'self', got parameters: {params}"
+        )
+
+    hints = get_type_hints(method)
+    return_type = hints.get("return")
+    if return_type is not None and return_type is not type(None):
+        raise EndpointValidationError(
+            f"{method_name}() in {cls.__name__} must return None, got {return_type}"
+        )
+
+
+def validate_setup_method(cls: Type) -> None:
+    """Validate that the app has a setup() method with correct signature.
+
+    Raises:
+        EndpointValidationError: If method is missing or has wrong signature.
+    """
+    _validate_lifecycle_method(cls, "setup")
+
+
+def validate_download_weights_method(cls: Type) -> None:
+    """Validate that the app has a download_weights() method with correct signature.
+
+    Raises:
+        EndpointValidationError: If method is missing or has wrong signature.
+    """
+    _validate_lifecycle_method(cls, "download_weights")

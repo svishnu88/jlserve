@@ -293,6 +293,12 @@ class TestValidateApp:
 
         @jlserve.app()
         class ValidApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def add(self, input: Input) -> Output:
                 return Output(result=input.value + 1)
@@ -310,6 +316,9 @@ class TestValidateApp:
         class ValidApp:
             def setup(self):
                 self.multiplier = 2
+
+            def download_weights(self) -> None:
+                pass
 
             @jlserve.endpoint()
             def multiply(self, input: Input) -> Output:
@@ -378,3 +387,225 @@ class TestGetMethodTypes:
 
         methods = get_endpoint_methods(MyApp)
         assert get_method_output_type(methods[0]) is Output
+
+
+class TestValidateSetupMethod:
+    """Tests for validate_setup_method function."""
+
+    def test_valid_setup_with_none_annotation(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class ValidApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        validate_setup_method(ValidApp)
+
+    def test_valid_setup_without_annotation(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class ValidApp:
+            def setup(self):
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        validate_setup_method(ValidApp)
+
+    def test_missing_setup_method(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_setup_method(InvalidApp)
+        assert "must define a setup() method" in str(exc_info.value)
+
+    def test_setup_not_callable(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            setup = "not a method"
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_setup_method(InvalidApp)
+        assert "setup must be a method" in str(exc_info.value)
+
+    def test_setup_with_extra_parameters(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            def setup(self, config: dict) -> None:
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_setup_method(InvalidApp)
+        assert "must only accept 'self'" in str(exc_info.value)
+        assert "['self', 'config']" in str(exc_info.value)
+
+    def test_setup_wrong_return_type(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            def setup(self) -> str:
+                return "invalid"
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_setup_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_setup_method(InvalidApp)
+        assert "must return None" in str(exc_info.value)
+
+
+class TestValidateDownloadWeightsMethod:
+    """Tests for validate_download_weights_method function."""
+
+    def test_valid_download_weights_with_none_annotation(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class ValidApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        validate_download_weights_method(ValidApp)
+
+    def test_valid_download_weights_without_annotation(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class ValidApp:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self):
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        validate_download_weights_method(ValidApp)
+
+    def test_missing_download_weights_method(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_download_weights_method(InvalidApp)
+        assert "must define a download_weights() method" in str(exc_info.value)
+
+    def test_download_weights_not_callable(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            download_weights = "not a method"
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_download_weights_method(InvalidApp)
+        assert "download_weights must be a method" in str(exc_info.value)
+
+    def test_download_weights_with_extra_parameters(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            def download_weights(self, cache_dir: str) -> None:
+                pass
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_download_weights_method(InvalidApp)
+        assert "must only accept 'self'" in str(exc_info.value)
+        assert "['self', 'cache_dir']" in str(exc_info.value)
+
+    def test_download_weights_wrong_return_type(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class InvalidApp:
+            def download_weights(self) -> str:
+                return "invalid"
+
+            @jlserve.endpoint()
+            def method(self, input: Input) -> Output:
+                pass
+
+        from jlserve.validator import validate_download_weights_method
+
+        with pytest.raises(EndpointValidationError) as exc_info:
+            validate_download_weights_method(InvalidApp)
+        assert "must return None" in str(exc_info.value)

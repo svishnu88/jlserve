@@ -1,16 +1,16 @@
 """CLI implementation for JLServe."""
 
-import importlib.util
-import subprocess
-import sys
 from pathlib import Path
 
 import typer
 import uvicorn
 
-from jlserve.decorator import _reset_registry, get_endpoint_methods, get_registered_app
-from jlserve.requirements import extract_requirements_from_file
+from jlserve.cli_utils import install_requirements, load_app_class, validate_python_file
+from jlserve.config import get_jlserve_cache_dir
+from jlserve.decorator import get_endpoint_methods
+from jlserve.exceptions import CacheConfigError
 from jlserve.server import create_app
+from jlserve.validator import validate_app
 
 app = typer.Typer(
     help="JLServe - A simple framework for creating ML endpoints",
@@ -31,72 +31,46 @@ def dev(
     port: int = typer.Option(8000, "--port", "-p", help="Port to serve on"),
 ) -> None:
     """Run an app locally for development."""
-    if not file.exists():
-        typer.echo(f"Error: File not found: {file}", err=True)
-        raise typer.Exit(1)
+    # Validate file exists and is a Python file
+    validate_python_file(file)
 
-    if not file.suffix == ".py":
-        typer.echo(f"Error: File must be a Python file: {file}", err=True)
-        raise typer.Exit(1)
-
-    # Step 1: Extract requirements via AST (before importing to avoid import errors)
+    # Check that build was run (marker file exists in cache)
     try:
-        requirements = extract_requirements_from_file(str(file))
-    except SyntaxError as e:
-        typer.echo(f"Error: Invalid Python syntax in {file}: {e}", err=True)
-        raise typer.Exit(1)
-    except Exception as e:
-        typer.echo(f"Error: Failed to extract requirements from {file}: {e}", err=True)
-        raise typer.Exit(1)
-
-    # Step 2: Install requirements with uv (shows output, fast if already satisfied)
-    if requirements:
-        typer.echo(f"Installing requirements: {', '.join(requirements)}")
-        try:
-            subprocess.run(
-                ["uv", "pip", "install", *requirements],
-                check=True,
-            )
-        except subprocess.CalledProcessError as e:
-            typer.echo(f"Error: Failed to install requirements: {e}", err=True)
-            raise typer.Exit(1)
-        except FileNotFoundError:
-            typer.echo(
-                "Error: 'uv' command not found. Please install uv: https://github.com/astral-sh/uv",
-                err=True,
-            )
-            raise typer.Exit(1)
-
-    # Clear any previously registered app
-    _reset_registry()
-
-    # Load the user's Python file
-    spec = importlib.util.spec_from_file_location("user_module", file)
-    if spec is None or spec.loader is None:
-        typer.echo(f"Error: Could not load file: {file}", err=True)
-        raise typer.Exit(1)
-
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["user_module"] = module
-    try:
-        spec.loader.exec_module(module)
-    except Exception as e:
-        # Check if it's a MultipleAppsError
-        if "MultipleAppsError" in type(e).__name__ or "multiple" in str(e).lower():
-            typer.echo(f"Error: {e}", err=True)
-            raise typer.Exit(1)
-        # Re-raise other exceptions
-        raise
-
-    # Get the registered app
-    app_cls = get_registered_app()
-    if app_cls is None:
+        cache_dir = get_jlserve_cache_dir()
+    except CacheConfigError as e:
+        typer.echo(f"Error: {e}", err=True)
         typer.echo(
-            "Error: No app found. Did you decorate a class with @jlserve.app()?",
+            "\nPlease set JLSERVE_CACHE_DIR and run 'jlserve build' first:",
             err=True,
         )
+        typer.echo(f"  export JLSERVE_CACHE_DIR=/path/to/cache", err=True)
+        typer.echo(f"  jlserve build {file}", err=True)
         raise typer.Exit(1)
 
+    marker_file = cache_dir / ".jlserve-build-complete"
+    if not marker_file.exists():
+        typer.echo(
+            f"Error: Build marker not found in {cache_dir}",
+            err=True,
+        )
+        typer.echo(
+            "\nThis suggests 'jlserve build' has not been run yet.",
+            err=True,
+        )
+        typer.echo("\nPlease run:", err=True)
+        typer.echo(f"  jlserve build {file}", err=True)
+        typer.echo("\nThen try again:", err=True)
+        typer.echo(f"  jlserve dev {file} --port {port}", err=True)
+        raise typer.Exit(1)
+
+    # Extract and install any requirements specified in @jlserve.app(requirements=[...])
+    # This happens before import to avoid chicken-and-egg problems
+    install_requirements(file, cache_dir)
+
+    # Import the file and get the @jlserve.app() decorated class
+    app_cls = load_app_class(file)
+
+    # Get the app name for display purposes
     app_name = getattr(app_cls, "_jlserve_app_name", "app")
 
     # Get endpoint methods for display
@@ -121,6 +95,60 @@ def dev(
 
     # Start Uvicorn server
     uvicorn.run(fastapi_app, host="0.0.0.0", port=port, log_level="info")
+
+
+@app.command("build")
+def build(
+    file: Path = typer.Argument(..., help="Path to the Python file containing the app"),
+) -> None:
+    """Build app by installing dependencies and downloading weights to cache.
+
+    This command is used in deployment pipelines to:
+    1. Install all required dependencies
+    2. Pre-download model weights to the cache directory
+    3. Validate the app structure before deployment
+    """
+    # Validate file exists and is a Python file
+    validate_python_file(file)
+
+    # Check that JLSERVE_CACHE_DIR is configured (required for build)
+    try:
+        cache_dir = get_jlserve_cache_dir()
+        typer.echo(f"✓ Cache directory: {cache_dir}")
+    except CacheConfigError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Extract and install requirements via AST parsing (before import)
+    install_requirements(file, cache_dir)
+
+    # Import the file and get the @jlserve.app() decorated class
+    app_cls = load_app_class(file)
+    app_name = getattr(app_cls, "_jlserve_app_name", "app")
+
+    # Validate app has required lifecycle methods (setup, download_weights, endpoints)
+    try:
+        validate_app(app_cls)
+    except Exception as e:
+        typer.echo(f"Error: App validation failed: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Create app instance and trigger weight download
+    typer.echo(f"✓ Loading app: {app_name}")
+    app_instance = app_cls()
+
+    # Call download_weights() to pre-fetch model files to cache
+    typer.echo("✓ Downloading weights...")
+    try:
+        app_instance.download_weights()
+    except Exception as e:
+        typer.echo(f"Error: download_weights() failed: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Create marker file to indicate build completed successfully
+    marker_file = cache_dir / ".jlserve-build-complete"
+    marker_file.touch()
+    typer.echo("✓ Build complete!")
 
 
 if __name__ == "__main__":

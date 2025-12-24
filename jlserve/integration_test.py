@@ -24,6 +24,12 @@ class TestCalculatorApp:
 
         @jlserve.app()
         class Calculator:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 self.operation_count = 0
 
@@ -78,6 +84,12 @@ class TestMLApp:
 
         @jlserve.app()
         class TextAnalyzer:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 # Mock ML model loading
                 self.sentiment_model = lambda text: ("POSITIVE", 0.95)
@@ -134,6 +146,12 @@ class TestSharedStateIntegration:
 
         @jlserve.app()
         class MLService:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             def setup(self):
                 # Simulate loading a heavy ML model
                 self.model_name = "linear_model_v1"
@@ -184,6 +202,12 @@ class TestCustomPaths:
 
         @jlserve.app()
         class MathOperations:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint(path="/v1/double")
             def double(self, input: NumberInput) -> NumberOutput:
                 return NumberOutput(result=input.n * 2)
@@ -219,6 +243,12 @@ class TestMinimalApp:
 
         @jlserve.app()
         class Math:
+            def setup(self) -> None:
+                pass
+
+            def download_weights(self) -> None:
+                pass
+
             @jlserve.endpoint()
             def double(self, i: In) -> Out:
                 return Out(y=i.x * 2)
