@@ -9,11 +9,13 @@ from jlserve.decorator import get_endpoint_methods
 from jlserve.exceptions import EndpointValidationError
 
 
-def validate_app(cls: Type) -> None:
+def validate_app(cls: Type, require_download_weights: bool = False) -> None:
     """Validate that an app class meets all requirements.
 
     Args:
         cls: The app class to validate.
+        require_download_weights: If True, validates that the app has a download_weights()
+            method with the correct signature. Used by `jlserve build` command.
 
     Raises:
         EndpointValidationError: If validation fails.
@@ -22,6 +24,8 @@ def validate_app(cls: Type) -> None:
     validate_has_endpoint_methods(cls)
     validate_endpoint_methods(cls)
     validate_no_duplicate_paths(cls)
+    if require_download_weights:
+        validate_download_weights_method(cls)
 
 
 def validate_is_jlserve_app(cls: Type) -> None:

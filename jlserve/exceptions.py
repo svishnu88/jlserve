@@ -23,3 +23,9 @@ class MultipleAppsError(JLServeError):
     """Raised when multiple @jlserve.app() classes are defined in a module."""
 
     pass
+
+
+class CacheConfigError(JLServeError):
+    """Raised when cache directory configuration is invalid."""
+
+    pass
