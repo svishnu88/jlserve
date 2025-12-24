@@ -93,3 +93,10 @@ def get_jlserve_cache_dir() -> Path:
 - Tests remain focused and maintainable
 - Faster test execution
 - Clearer signal when tests fail (business logic issue, not stdlib)
+
+## Code Quality Best Practices
+
+### DRY Principle (Don't Repeat Yourself)
+
+Always look for code duplication and refactor to shared helpers when you see the same logic repeated:
+
