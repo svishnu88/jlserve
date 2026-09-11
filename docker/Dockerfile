@@ -20,9 +20,9 @@ ENV PYTHONUNBUFFERED=1 \
     JLSERVE_APP=/model_weights/jlserve/app.py \
     JLSERVE_PORT=8000
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+# No apt step: the base carries CA certificates and Python, and the
+# entrypoint needs nothing else. Keeps the build working on hosts that only
+# allow HTTPS out (the Ubuntu mirrors are plain HTTP).
 
 # uv: what jlserve uses to install an app's requirements at startup.
 COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /usr/local/bin/uv
