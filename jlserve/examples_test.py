@@ -57,6 +57,12 @@ class TestSDTurboExample:
         assert settings.min_workers == 0
         assert settings.max_workers == 1
         assert settings.idle_timeout == 300
+        assert settings.weights == ("stabilityai/sd-turbo",)
+
+    def test_declared_weights_match_the_model_loaded_in_setup(self):
+        source = SD_TURBO.read_text()
+        for w in get_deploy_settings(_load_example(SD_TURBO)).weights:
+            assert f'"{w}"' in source, f"{w} declared but not loaded in setup()"
 
     def test_requirements_extracted_from_file(self):
         reqs = extract_requirements_from_file(str(SD_TURBO))

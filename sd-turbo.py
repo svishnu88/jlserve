@@ -30,6 +30,7 @@ class PromptOutput(BaseModel):
 
 @jlserve.app(
     requirements=["diffusers", "transformers", "accelerate"],
+    weights=["stabilityai/sd-turbo"],
     gpu="L4",
     gpus_per_worker=1,
     min_workers=0,
@@ -43,7 +44,9 @@ class SDTurbo:
     - Loading a model once in setup()
     - Generating images from text prompts in a single step
     - Bounded inputs so a request cannot exhaust GPU memory
-    - Deploy settings declared next to the code
+    - Deploy settings declared next to the code, including the weights the
+      platform must place on the worker before it starts (workers have no
+      internet; the id here matches the one in setup())
     """
 
     def setup(self):

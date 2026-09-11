@@ -1,6 +1,7 @@
 """Decorators for defining JLServe apps and endpoints."""
 
 import functools
+import re
 from dataclasses import dataclass
 from typing import Callable, Optional, Type
 
@@ -15,6 +16,10 @@ _registered_app: Optional[Type] = None
 ALLOWED_GPUS_PER_WORKER = (1, 2, 4, 8)
 MAX_WORKERS_LIMIT = 100
 MAX_IDLE_TIMEOUT_SECONDS = 86400  # 24 hours
+
+# A Hugging Face Hub id: owner/name, optionally @revision. Letters, digits,
+# dots, dashes and underscores, as the Hub allows.
+_HUB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9._/-]+)?$")
 
 
 @dataclass(frozen=True)
@@ -34,6 +39,12 @@ class DeploySettings:
         max_workers: Upper bound on workers. Must be >= min_workers, and the
             two cannot both be 0.
         idle_timeout: Seconds a worker may sit idle before it is shut down.
+        weights: Hugging Face Hub ids the app loads in setup(), e.g.
+            ("stabilityai/sd-turbo",). Workers have no internet, so the
+            platform downloads these onto the deployment filesystem before the
+            worker starts; from_pretrained then finds them in the cache. The
+            id also appears inside setup(), the same way a package appears in
+            both requirements and an import.
     """
 
     gpu: Optional[str] = None
@@ -41,6 +52,7 @@ class DeploySettings:
     min_workers: int = 0
     max_workers: int = 1
     idle_timeout: int = 600
+    weights: tuple[str, ...] = ()
 
 
 def _validate_deploy_settings(settings: DeploySettings) -> None:
@@ -87,6 +99,12 @@ def _validate_deploy_settings(settings: DeploySettings) -> None:
             f"got {settings.idle_timeout}"
         )
 
+    for i, w in enumerate(settings.weights):
+        if not isinstance(w, str) or not _HUB_ID.match(w.strip()):
+            raise ValueError(
+                f"weights[{i}] must be a Hugging Face Hub id like 'owner/name', got {w!r}"
+            )
+
 
 def app(
     name: Optional[str] = None,
@@ -96,6 +114,7 @@ def app(
     min_workers: int = 0,
     max_workers: int = 1,
     idle_timeout: int = 600,
+    weights: Optional[list[str]] = None,
 ):
     """Decorator to mark a class as a JLServe app.
 
@@ -116,6 +135,10 @@ def app(
         min_workers: Workers kept warm at all times. 0 scales to zero.
         max_workers: Upper bound on workers. Must be >= min_workers.
         idle_timeout: Seconds an idle worker stays up before shutdown.
+        weights: Hugging Face Hub ids the app loads in setup(), e.g.
+            ["stabilityai/sd-turbo"]. Downloaded by the platform onto the
+            deployment filesystem before the worker starts. Ignored by
+            `jlserve dev`, which lets from_pretrained download as usual.
 
     Returns:
         A decorator function that registers the class as an app.
@@ -151,12 +174,16 @@ def app(
                         f"requirements[{i}] must be a non-empty string"
                     )
 
+        if weights is not None and not isinstance(weights, list):
+            raise ValueError(f"weights must be a list of Hub ids, got {type(weights).__name__}")
+
         deploy_settings = DeploySettings(
             gpu=gpu,
             gpus_per_worker=gpus_per_worker,
             min_workers=min_workers,
             max_workers=max_workers,
             idle_timeout=idle_timeout,
+            weights=tuple(w.strip() if isinstance(w, str) else w for w in weights) if weights else (),
         )
         _validate_deploy_settings(deploy_settings)
 

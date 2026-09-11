@@ -487,3 +487,45 @@ class TestResetRegistry:
         assert get_registered_app() is MyApp
         _reset_registry()
         assert get_registered_app() is None
+
+
+class TestWeightsSetting:
+    """weights=[...] on @jlserve.app(): Hub ids the platform downloads first."""
+
+    def setup_method(self):
+        _reset_registry()
+
+    def teardown_method(self):
+        _reset_registry()
+
+    def test_default_is_empty(self):
+        @jlserve.app()
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == ()
+
+    def test_recorded_as_tuple_and_stripped(self):
+        @jlserve.app(weights=[" stabilityai/sd-turbo ", "black-forest-labs/FLUX.1-schnell"])
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == (
+            "stabilityai/sd-turbo", "black-forest-labs/FLUX.1-schnell")
+
+    def test_revision_suffix_allowed(self):
+        @jlserve.app(weights=["stabilityai/sd-turbo@fp16"])
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == ("stabilityai/sd-turbo@fp16",)
+
+    @pytest.mark.parametrize("bad", ["sd-turbo", "/x", "a/", "a b/c", "http://x/y", "", 5])
+    def test_bad_hub_id_rejected(self, bad):
+        with pytest.raises(ValueError, match="weights\\[0\\]"):
+            @jlserve.app(weights=[bad])
+            class A:
+                pass
+
+    def test_must_be_a_list(self):
+        with pytest.raises(ValueError, match="weights must be a list"):
+            @jlserve.app(weights="stabilityai/sd-turbo")
+            class A:
+                pass

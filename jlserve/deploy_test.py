@@ -67,8 +67,13 @@ class TestBuildCreatePayload:
         assert p["gpus_per_worker"] == 2
         assert (p["min_workers"], p["max_workers"], p["idle_timeout"]) == (1, 3, 120)
         assert p["concurrent_requests"] == 1
-        assert p["args"] == {"entrypoint": APP_FILE_NAME, "requirements": ["diffusers", "torch"]}
+        assert p["args"] == {"entrypoint": APP_FILE_NAME, "requirements": ["diffusers", "torch"],
+                             "weights": []}
         assert p["env"] == {}
+
+    def test_weights_travel_in_args(self):
+        cls = make_app(gpu="L4", weights=["stabilityai/sd-turbo"])
+        assert build_create_payload(cls)["args"]["weights"] == ["stabilityai/sd-turbo"]
 
     def test_gpu_override_wins(self):
         cls = make_app(gpu="L4")

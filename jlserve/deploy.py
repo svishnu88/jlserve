@@ -103,6 +103,7 @@ def build_create_payload(
         "args": {
             "entrypoint": APP_FILE_NAME,
             "requirements": list(app_cls._jlserve_requirements),
+            "weights": list(settings.weights),
         },
         "env": env,
     }

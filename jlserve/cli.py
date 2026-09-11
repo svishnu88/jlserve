@@ -208,6 +208,13 @@ def deploy(
     )
     if payload["args"]["requirements"]:
         typer.echo(f"Requirements: {', '.join(payload['args']['requirements'])}")
+    if payload["args"]["weights"]:
+        typer.echo(f"Weights (downloaded before the worker starts): {', '.join(payload['args']['weights'])}")
+    else:
+        typer.echo(
+            "Weights: none declared. Workers have no internet; if setup() loads a "
+            "Hub model, add weights=[...] to @jlserve.app()."
+        )
 
     try:
         with ServerlessClient(endpoint_url, api_token) as client:

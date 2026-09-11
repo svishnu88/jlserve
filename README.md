@@ -92,6 +92,7 @@ Decorator that marks a class as a JLServe app. Only one app per module/deploymen
 | `min_workers` | `int` | No | Workers kept warm at all times, `0`–`100`. Default `0` (scale to zero). |
 | `max_workers` | `int` | No | Upper bound on workers, `0`–`100`. Must be ≥ `min_workers`; the two cannot both be `0`. Default `1`. |
 | `idle_timeout` | `int` | No | Seconds an idle worker stays up before shutdown, `0`–`86400`. Default `600`. |
+| `weights` | `list[str]` | No | Hugging Face Hub ids the app loads in `setup()`, e.g. `["stabilityai/sd-turbo"]`. Workers have no internet; the platform downloads these onto the worker's filesystem before it starts. Ignored by `jlserve dev`. |
 
 The deploy settings are validated when the class is decorated and stored on it; `jlserve dev` ignores them. They describe how the app should run once deployed, and are read by the deploy tooling.
 
