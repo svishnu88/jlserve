@@ -312,6 +312,191 @@ class TestErrorHandling:
             assert "Something went wrong" in response.json()["detail"]
 
 
+class TestHealthRoute:
+    """Tests for GET /health, which the serverless platform polls."""
+
+    def test_health_returns_200_after_setup(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class MyApp:
+            def setup(self):
+                self.ready_marker = True
+
+            @jlserve.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
+
+        app = create_app(MyApp)
+        with TestClient(app) as client:
+            response = client.get("/health")
+            assert response.status_code == 200
+            assert response.json() == {"status": "ok"}
+
+    def test_health_returns_503_before_setup(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class MyApp:
+            @jlserve.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
+
+        app = create_app(MyApp)
+        # No `with` block: the lifespan (and therefore setup) has not run.
+        client = TestClient(app)
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.json() == {"status": "starting"}
+
+    def test_health_not_in_openapi_schema(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class MyApp:
+            @jlserve.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
+
+        app = create_app(MyApp)
+        with TestClient(app) as client:
+            paths = client.get("/openapi.json").json()["paths"]
+            assert "/health" not in paths
+            assert "/process" in paths
+
+
+class TestThreadedEndpoints:
+    """Endpoint methods run in a worker thread, one at a time."""
+
+    def test_health_answers_during_a_slow_endpoint(self):
+        import threading
+        import time
+
+        _reset_registry()
+
+        started = threading.Event()
+
+        @jlserve.app()
+        class SlowApp:
+            @jlserve.endpoint()
+            def slow(self, input: Input) -> Output:
+                started.set()
+                time.sleep(1.0)
+                return Output(result=input.value)
+
+        app = create_app(SlowApp)
+        with TestClient(app) as client:
+            results = {}
+
+            def call_slow():
+                results["slow"] = client.post("/slow", json={"value": 1})
+
+            t = threading.Thread(target=call_slow)
+            t.start()
+            assert started.wait(timeout=2.0), "slow endpoint never started"
+
+            t0 = time.monotonic()
+            health = client.get("/health")
+            elapsed = time.monotonic() - t0
+            t.join(timeout=5.0)
+
+            assert health.status_code == 200
+            # Must not have waited for the 1s endpoint to finish.
+            assert elapsed < 0.5, f"/health blocked for {elapsed:.2f}s"
+            assert results["slow"].status_code == 200
+            assert results["slow"].json() == {"result": 1}
+
+    def test_endpoint_calls_do_not_overlap(self):
+        import threading
+        import time
+
+        _reset_registry()
+
+        in_flight = {"count": 0, "max": 0}
+        guard = threading.Lock()
+
+        @jlserve.app()
+        class Serial:
+            @jlserve.endpoint()
+            def work(self, input: Input) -> Output:
+                with guard:
+                    in_flight["count"] += 1
+                    in_flight["max"] = max(in_flight["max"], in_flight["count"])
+                time.sleep(0.3)
+                with guard:
+                    in_flight["count"] -= 1
+                return Output(result=input.value)
+
+        app = create_app(Serial)
+        with TestClient(app) as client:
+            threads = [
+                threading.Thread(target=lambda: client.post("/work", json={"value": i}))
+                for i in range(3)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=5.0)
+
+        assert in_flight["max"] == 1, "endpoint calls overlapped"
+
+    def test_exception_in_thread_still_returns_500(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class MyApp:
+            @jlserve.endpoint()
+            def failing(self, input: Input) -> Output:
+                raise ValueError("boom in thread")
+
+        app = create_app(MyApp)
+        with TestClient(app) as client:
+            response = client.post("/failing", json={"value": 1})
+            assert response.status_code == 500
+            assert "boom in thread" in response.json()["detail"]
+
+
+class TestOnReady:
+    """The on_ready callback fires only after setup() has succeeded."""
+
+    def test_on_ready_called_after_setup(self):
+        _reset_registry()
+        events = []
+
+        @jlserve.app()
+        class MyApp:
+            def setup(self):
+                events.append("setup")
+
+            @jlserve.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
+
+        app = create_app(MyApp, on_ready=lambda: events.append("ready"))
+        assert events == []
+        with TestClient(app):
+            assert events == ["setup", "ready"]
+
+    def test_on_ready_not_called_when_setup_fails(self):
+        _reset_registry()
+        events = []
+
+        @jlserve.app()
+        class MyApp:
+            def setup(self):
+                raise RuntimeError("no model")
+
+            @jlserve.endpoint()
+            def process(self, input: Input) -> Output:
+                return Output(result=input.value)
+
+        app = create_app(MyApp, on_ready=lambda: events.append("ready"))
+        with pytest.raises(EndpointSetupError):
+            with TestClient(app):
+                pass
+        assert events == []
+
+
 class TestOpenAPIDocs:
     """Tests for OpenAPI documentation."""
 

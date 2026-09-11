@@ -387,3 +387,166 @@ class MyModel:
             # If we had imported the file first, the commented imports would fail
         finally:
             Path(temp_path).unlink()
+
+
+VALID_APP = b'''
+import jlserve
+from pydantic import BaseModel
+
+
+class Input(BaseModel):
+    x: int
+
+
+class Output(BaseModel):
+    y: int
+
+
+@jlserve.app(requirements=["torch"], gpu="L4", min_workers=0, max_workers=2, idle_timeout=120)
+class Doubler:
+    @jlserve.endpoint()
+    def double(self, input: Input) -> Output:
+        return Output(y=input.x * 2)
+'''
+
+
+class TestDeployCommand:
+    """Tests for the deploy command with the service client mocked."""
+
+    @staticmethod
+    def write_app(source: bytes = VALID_APP) -> str:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+            f.write(source)
+            return f.name
+
+    def test_help_shows_deploy_command(self):
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "deploy" in result.output
+
+    def test_deploy_requires_token(self, monkeypatch):
+        monkeypatch.delenv("JARVISLABS_API_TOKEN", raising=False)
+        path = self.write_app()
+        try:
+            result = runner.invoke(app, ["deploy", path])
+            assert result.exit_code == 1
+            assert "No API token" in result.output
+        finally:
+            Path(path).unlink()
+
+    def test_deploy_requires_gpu(self):
+        path = self.write_app(VALID_APP.replace(b'gpu="L4", ', b""))
+        try:
+            result = runner.invoke(app, ["deploy", path, "--token", "t"])
+            assert result.exit_code == 1
+            assert "No GPU type" in result.output
+        finally:
+            Path(path).unlink()
+
+    def test_deploy_validation_error_is_one_line(self):
+        path = self.write_app(VALID_APP.replace(b"input: Input", b"input"))
+        try:
+            result = runner.invoke(app, ["deploy", path, "--token", "t"])
+            assert result.exit_code == 1
+            assert "Error: Endpoint method double() must have a type hint" in result.output
+            assert "Traceback" not in result.output
+        finally:
+            Path(path).unlink()
+
+    @patch("jlserve.cli.ServerlessClient")
+    def test_deploy_success_prints_urls(self, mock_client_cls):
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.create.return_value = {"deployment_id": "01DEP", "region": "noida"}
+        client.status.side_effect = [{"status": "starting"}, {"status": "running"}]
+        mock_client_cls.return_value = client
+
+        path = self.write_app()
+        try:
+            with patch("jlserve.deploy.time.sleep"):
+                result = runner.invoke(
+                    app, ["deploy", path, "--token", "t", "--endpoint", "https://svc.example"],
+                )
+        finally:
+            Path(path).unlink()
+
+        assert result.exit_code == 0, result.output
+        mock_client_cls.assert_called_once_with("https://svc.example", "t")
+        payload, sent_file = client.create.call_args.args
+        assert payload["framework"] == "jlserve"
+        assert payload["gpus_to_use"] == {"gpus": ["L4"]}
+        assert payload["max_workers"] == 2
+        assert payload["args"]["requirements"] == ["torch"]
+        assert str(sent_file) == path
+        assert "status: starting" in result.output
+        assert "status: running" in result.output
+        assert "https://svc.example/deployment/01DEP/double" in result.output
+        assert "Deployment 01DEP is running" in result.output
+
+    @patch("jlserve.cli.ServerlessClient")
+    def test_deploy_no_wait_skips_polling(self, mock_client_cls):
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.create.return_value = {"deployment_id": "01DEP", "region": "noida"}
+        mock_client_cls.return_value = client
+
+        path = self.write_app()
+        try:
+            result = runner.invoke(app, ["deploy", path, "--token", "t", "--no-wait"])
+        finally:
+            Path(path).unlink()
+
+        assert result.exit_code == 0, result.output
+        client.status.assert_not_called()
+        assert "Not waiting" in result.output
+        assert "/deployment/01DEP/double" in result.output
+
+    @patch("jlserve.cli.ServerlessClient")
+    def test_deploy_failed_shows_service_error(self, mock_client_cls):
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.create.return_value = {"deployment_id": "01DEP", "region": "noida"}
+        client.status.return_value = {"status": "failed"}
+        client.describe.return_value = {"status": "failed", "error_message": "no GPU available"}
+        mock_client_cls.return_value = client
+
+        path = self.write_app()
+        try:
+            result = runner.invoke(app, ["deploy", path, "--token", "t"])
+        finally:
+            Path(path).unlink()
+
+        assert result.exit_code == 1
+        assert "Deployment 01DEP failed: no GPU available" in result.output
+
+    @patch("jlserve.cli.ServerlessClient")
+    def test_deploy_create_error_from_service(self, mock_client_cls):
+        from jlserve.deploy import DeployError
+
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.create.side_effect = DeployError("Could not create deployment: 400 GPU types ['L4'] are not available")
+        mock_client_cls.return_value = client
+
+        path = self.write_app()
+        try:
+            result = runner.invoke(app, ["deploy", path, "--token", "t"])
+        finally:
+            Path(path).unlink()
+
+        assert result.exit_code == 1
+        assert "400 GPU types" in result.output
+        client.status.assert_not_called()
+
+    @patch("jlserve.cli.subprocess.run")
+    def test_dev_validation_error_is_one_line(self, mock_subprocess):
+        """The shared loader also gives dev a clean message instead of a traceback."""
+        path = self.write_app(VALID_APP.replace(b"input: Input", b"input"))
+        try:
+            result = runner.invoke(app, ["dev", path])
+            mock_subprocess.assert_called_once()
+            assert result.exit_code == 1
+            assert "Error: Endpoint method double() must have a type hint" in result.output
+            assert "Traceback" not in result.output
+        finally:
+            Path(path).unlink()

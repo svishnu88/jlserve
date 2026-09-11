@@ -3,7 +3,13 @@
 import pytest
 
 import jlserve
-from jlserve.decorator import _reset_registry, get_endpoint_methods, get_registered_app
+from jlserve.decorator import (
+    DeploySettings,
+    _reset_registry,
+    get_deploy_settings,
+    get_endpoint_methods,
+    get_registered_app,
+)
 from jlserve.exceptions import MultipleAppsError
 
 
@@ -184,6 +190,174 @@ class TestAppDecorator:
         assert "requirements[1] must be a non-empty string" in str(exc_info.value)
 
 
+class TestDeploySettings:
+    """Tests for the deploy settings accepted by @jlserve.app()."""
+
+    def test_defaults_when_no_deploy_args_given(self):
+        _reset_registry()
+
+        @jlserve.app()
+        class MyApp:
+            pass
+
+        settings = get_deploy_settings(MyApp)
+        assert settings.gpu is None
+        assert settings.gpus_per_worker == 1
+        assert settings.min_workers == 0
+        assert settings.max_workers == 1
+        assert settings.idle_timeout == 600
+
+    def test_all_settings_are_recorded(self):
+        _reset_registry()
+
+        @jlserve.app(
+            gpu="H100",
+            gpus_per_worker=2,
+            min_workers=1,
+            max_workers=4,
+            idle_timeout=300,
+        )
+        class MyApp:
+            pass
+
+        settings = get_deploy_settings(MyApp)
+        assert settings == DeploySettings(
+            gpu="H100", gpus_per_worker=2, min_workers=1, max_workers=4, idle_timeout=300
+        )
+
+    def test_settings_are_immutable(self):
+        _reset_registry()
+
+        @jlserve.app(gpu="L4")
+        class MyApp:
+            pass
+
+        with pytest.raises(Exception):
+            get_deploy_settings(MyApp).gpu = "H100"
+
+    def test_deploy_settings_do_not_affect_requirements_or_name(self):
+        _reset_registry()
+
+        @jlserve.app(name="Named", requirements=["torch"], gpu="L4")
+        class MyApp:
+            pass
+
+        assert MyApp._jlserve_app_name == "Named"
+        assert MyApp._jlserve_requirements == ["torch"]
+        assert get_deploy_settings(MyApp).gpu == "L4"
+
+    @pytest.mark.parametrize("gpu", ["", "   "])
+    def test_empty_gpu_raises(self, gpu):
+        _reset_registry()
+        with pytest.raises(ValueError, match="gpu must be a non-empty string"):
+            @jlserve.app(gpu=gpu)
+            class MyApp:
+                pass
+
+    def test_non_string_gpu_raises(self):
+        _reset_registry()
+        with pytest.raises(ValueError, match="gpu must be a non-empty string"):
+            @jlserve.app(gpu=4)
+            class MyApp:
+                pass
+
+    @pytest.mark.parametrize("count", [1, 2, 4, 8])
+    def test_allowed_gpus_per_worker(self, count):
+        _reset_registry()
+
+        @jlserve.app(gpus_per_worker=count)
+        class MyApp:
+            pass
+
+        assert get_deploy_settings(MyApp).gpus_per_worker == count
+
+    @pytest.mark.parametrize("count", [0, 3, 5, 16, -1])
+    def test_disallowed_gpus_per_worker_raises(self, count):
+        _reset_registry()
+        with pytest.raises(ValueError, match="gpus_per_worker must be one of"):
+            @jlserve.app(gpus_per_worker=count)
+            class MyApp:
+                pass
+
+    def test_bool_is_not_accepted_as_integer(self):
+        _reset_registry()
+        with pytest.raises(ValueError, match="gpus_per_worker must be an integer"):
+            @jlserve.app(gpus_per_worker=True)
+            class MyApp:
+                pass
+
+    def test_non_integer_worker_count_raises(self):
+        _reset_registry()
+        with pytest.raises(ValueError, match="max_workers must be an integer"):
+            @jlserve.app(max_workers="2")
+            class MyApp:
+                pass
+
+    def test_min_greater_than_max_raises(self):
+        _reset_registry()
+        with pytest.raises(ValueError, match="cannot exceed max_workers"):
+            @jlserve.app(min_workers=3, max_workers=2)
+            class MyApp:
+                pass
+
+    def test_both_worker_counts_zero_raises(self):
+        _reset_registry()
+        with pytest.raises(ValueError, match="cannot both be 0"):
+            @jlserve.app(min_workers=0, max_workers=0)
+            class MyApp:
+                pass
+
+    def test_min_equal_to_max_is_allowed(self):
+        _reset_registry()
+
+        @jlserve.app(min_workers=2, max_workers=2)
+        class MyApp:
+            pass
+
+        assert get_deploy_settings(MyApp).min_workers == 2
+
+    @pytest.mark.parametrize("field,value", [
+        ("min_workers", -1),
+        ("min_workers", 101),
+        ("max_workers", 101),
+    ])
+    def test_worker_counts_out_of_range_raise(self, field, value):
+        _reset_registry()
+        kwargs = {field: value}
+        if field == "min_workers" and value > 1:
+            kwargs["max_workers"] = value  # keep min <= max so the range check is what fires
+        with pytest.raises(ValueError, match=f"{field} must be between 0 and 100"):
+            @jlserve.app(**kwargs)
+            class MyApp:
+                pass
+
+    @pytest.mark.parametrize("value", [-1, 86401])
+    def test_idle_timeout_out_of_range_raises(self, value):
+        _reset_registry()
+        with pytest.raises(ValueError, match="idle_timeout must be between 0 and 86400"):
+            @jlserve.app(idle_timeout=value)
+            class MyApp:
+                pass
+
+    @pytest.mark.parametrize("value", [0, 86400])
+    def test_idle_timeout_bounds_are_inclusive(self, value):
+        _reset_registry()
+
+        @jlserve.app(idle_timeout=value)
+        class MyApp:
+            pass
+
+        assert get_deploy_settings(MyApp).idle_timeout == value
+
+    def test_invalid_settings_do_not_register_the_app(self):
+        _reset_registry()
+        with pytest.raises(ValueError):
+            @jlserve.app(gpus_per_worker=3)
+            class MyApp:
+                pass
+        assert get_registered_app() is None
+
+
 class TestEndpointDecorator:
     """Tests for the @jlserve.endpoint() method decorator."""
 
@@ -313,3 +487,45 @@ class TestResetRegistry:
         assert get_registered_app() is MyApp
         _reset_registry()
         assert get_registered_app() is None
+
+
+class TestWeightsSetting:
+    """weights=[...] on @jlserve.app(): Hub ids the platform downloads first."""
+
+    def setup_method(self):
+        _reset_registry()
+
+    def teardown_method(self):
+        _reset_registry()
+
+    def test_default_is_empty(self):
+        @jlserve.app()
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == ()
+
+    def test_recorded_as_tuple_and_stripped(self):
+        @jlserve.app(weights=[" stabilityai/sd-turbo ", "black-forest-labs/FLUX.1-schnell"])
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == (
+            "stabilityai/sd-turbo", "black-forest-labs/FLUX.1-schnell")
+
+    def test_revision_suffix_allowed(self):
+        @jlserve.app(weights=["stabilityai/sd-turbo@fp16"])
+        class A:
+            pass
+        assert get_deploy_settings(A).weights == ("stabilityai/sd-turbo@fp16",)
+
+    @pytest.mark.parametrize("bad", ["sd-turbo", "/x", "a/", "a b/c", "http://x/y", "", 5])
+    def test_bad_hub_id_rejected(self, bad):
+        with pytest.raises(ValueError, match="weights\\[0\\]"):
+            @jlserve.app(weights=[bad])
+            class A:
+                pass
+
+    def test_must_be_a_list(self):
+        with pytest.raises(ValueError, match="weights must be a list"):
+            @jlserve.app(weights="stabilityai/sd-turbo")
+            class A:
+                pass
